@@ -88,13 +88,13 @@ async def run_agent1_turn(session_id: str, topic: str, category: str):
         await sse_event_manager.emit(
             session_id,
             EventType.SPEAKER_CHANGE,
-            {"speaker": "agent1", "role": "구현계획 전문가"}
+            {"active_speaker": "agent1"}
         )
         
         await sse_event_manager.emit(
             session_id,
             EventType.MESSAGE_STREAM_START,
-            {"speaker": "agent1"}
+            {"role": "agent1", "round_index": session.round_index, "phase": "agent1_turn"}
         )
         
         # Agent 1 실행 (스트리밍)
@@ -110,7 +110,7 @@ async def run_agent1_turn(session_id: str, topic: str, category: str):
                 await sse_event_manager.emit(
                     session_id,
                     EventType.MESSAGE_STREAM_CHUNK,
-                    {"speaker": "agent1", "chunk": chunk}
+                    {"text": chunk}
                 )
             return full_response
         
@@ -120,7 +120,7 @@ async def run_agent1_turn(session_id: str, topic: str, category: str):
         await sse_event_manager.emit(
             session_id,
             EventType.MESSAGE_STREAM_END,
-            {"speaker": "agent1"}
+            {"message_id": f"agent1-{session_id}-{session.round_index}"}
         )
         
         # TODO: 향후 CaseFile에 대화 기록 저장 로직 추가
