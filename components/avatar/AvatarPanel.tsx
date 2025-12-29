@@ -120,18 +120,40 @@ export default function AvatarPanel({ activeSpeaker }: AvatarPanelProps) {
         { id: 'agent3', name: 'Agent 3', role: 'Synthesizer', colorTheme: 'purple' as const },
     ]
 
+    const topAgents = agents.filter(a => ['agent1', 'agent2'].includes(a.id))
+    const bottomAgents = agents.filter(a => a.id === 'agent3')
+
     return (
         <div className={styles.avatarPanel}>
-            <div className={styles.cardGrid}>
-                {agents.map((agent) => (
-                    <AgentCard
-                        key={agent.id}
-                        agentId={agent.id}
-                        name={agent.name}
-                        role={agent.role}
-                        isSpeaking={activeSpeaker === agent.id}
-                        colorTheme={agent.colorTheme}
-                    />
+            {/* 상단: Agent 1, Agent 2 */}
+            <div className={styles.topRow}>
+                {topAgents.map((agent) => (
+                    <div key={agent.id} className={styles.monitorWrapper}>
+                        <AgentCard
+                            agentId={agent.id}
+                            name={agent.name}
+                            role={agent.role}
+                            isSpeaking={activeSpeaker === agent.id}
+                            colorTheme={agent.colorTheme}
+                        />
+                        <div className={styles.monitorStand} />
+                    </div>
+                ))}
+            </div>
+
+            {/* 하단: Agent 3 */}
+            <div className={styles.bottomRow}>
+                {bottomAgents.map((agent) => (
+                    <div key={agent.id} className={styles.monitorWrapper}>
+                        <AgentCard
+                            agentId={agent.id}
+                            name={agent.name}
+                            role={agent.role}
+                            isSpeaking={activeSpeaker === agent.id}
+                            colorTheme={agent.colorTheme}
+                        />
+                        <div className={styles.monitorStand} />
+                    </div>
                 ))}
             </div>
         </div>

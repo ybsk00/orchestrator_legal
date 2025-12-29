@@ -23,23 +23,31 @@ class TurnSpec:
 
 class TurnManager:
     def __init__(self):
-        # 3라운드 9단계 대화 시나리오 정의
-        self.turns: List[TurnSpec] = [
-            # Round 1
+        from config import MAX_ROUNDS
+        
+        self.turns: List[TurnSpec] = []
+        
+        # Round 1: 초기 제안
+        self.turns.extend([
             TurnSpec(AgentRole.AGENT1, TurnType.PLAN, "초기 구현 계획 제시", 500),
             TurnSpec(AgentRole.AGENT2, TurnType.CRITIQUE, "핵심 비판 및 리스크 지적", 300),
             TurnSpec(AgentRole.AGENT3, TurnType.COMPROMISE, "1차 절충안 제시", 300),
-            
-            # Round 2
-            TurnSpec(AgentRole.AGENT2, TurnType.REBUTTAL, "절충안에 대한 추가 반박", 300),
-            TurnSpec(AgentRole.AGENT1, TurnType.DEFENSE, "비판에 대한 방어 및 보완책", 300),
-            TurnSpec(AgentRole.AGENT3, TurnType.COMPROMISE, "2차 절충안 및 방향성 정리", 300),
-            
-            # Round 3
+        ])
+
+        # Round 2 ~ N-1: 심화 토론
+        for i in range(2, MAX_ROUNDS):
+            self.turns.extend([
+                TurnSpec(AgentRole.AGENT2, TurnType.REBUTTAL, f"절충안에 대한 추가 반박 (Round {i})", 300),
+                TurnSpec(AgentRole.AGENT1, TurnType.DEFENSE, f"비판에 대한 방어 및 보완책 (Round {i})", 300),
+                TurnSpec(AgentRole.AGENT3, TurnType.COMPROMISE, f"{i}차 절충안 및 방향성 정리", 300),
+            ])
+
+        # Round N (Final): 최종 정리
+        self.turns.extend([
             TurnSpec(AgentRole.AGENT2, TurnType.REBUTTAL, "마지막 점검 및 우려사항", 300),
             TurnSpec(AgentRole.AGENT1, TurnType.DEFENSE, "최종 실행 의지 및 해결책", 300),
             TurnSpec(AgentRole.AGENT3, TurnType.FINAL_REPORT, "최종 합의안 및 리포트 작성", 1500),
-        ]
+        ])
 
     def get_turn(self, turn_index: int) -> Optional[TurnSpec]:
         """
