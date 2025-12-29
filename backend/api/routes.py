@@ -2,6 +2,7 @@
 API 라우트 정의
 """
 import asyncio
+import logging
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -16,6 +17,10 @@ from agents.base_agent import gemini_client
 from agents.agent1_planner import Agent1Planner
 from agents.agent2_critic import Agent2Critic
 from .events import sse_event_manager, EventType
+
+# 로깅 설정
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
@@ -69,20 +74,30 @@ async def run_agent1_turn(session_id: str, topic: str, category: str):
     
     세션 생성 후 자동으로 호출되어 첫 대화를 시작합니다.
     """
+    logger.info(f"[Agent1Turn] 시작 - session_id={session_id}, topic={topic}, category={category}")
+    
     session = state_machine.get_session(session_id)
     if not session:
+        logger.error(f"[Agent1Turn] 세션을 찾을 수 없음 - session_id={session_id}")
         return
     
+    logger.info(f"[Agent1Turn] 세션 조회 성공 - status={session.status}, round={session.round_index}")
+    
     case_file = case_files_store.get(session_id)
+    logger.info(f"[Agent1Turn] CaseFile 조회 - found={case_file is not None}")
     
     try:
         # 새 라운드 시작
+        logger.info(f"[Agent1Turn] 새 라운드 시작 시도")
         state_machine.start_new_round(session_id)
+        logger.info(f"[Agent1Turn] 라운드 시작됨 - round_index={session.round_index}")
+        
         await sse_event_manager.emit(
             session_id,
             EventType.ROUND_START,
             {"round_index": session.round_index}
         )
+        logger.info(f"[Agent1Turn] ROUND_START 이벤트 발송 완료")
         
         # Agent 1 발언 시작 알림
         await sse_event_manager.emit(
@@ -90,16 +105,20 @@ async def run_agent1_turn(session_id: str, topic: str, category: str):
             EventType.SPEAKER_CHANGE,
             {"active_speaker": "agent1"}
         )
+        logger.info(f"[Agent1Turn] SPEAKER_CHANGE 이벤트 발송 완료")
         
         await sse_event_manager.emit(
             session_id,
             EventType.MESSAGE_STREAM_START,
             {"role": "agent1", "round_index": session.round_index, "phase": "agent1_turn"}
         )
+        logger.info(f"[Agent1Turn] MESSAGE_STREAM_START 이벤트 발송 완료")
         
         # Agent 1 실행 (스트리밍)
         async def agent1_turn():
+            logger.info(f"[Agent1Turn] Gemini API 호출 시작")
             full_response = ""
+            chunk_count = 0
             async for chunk in agent1.stream_response(
                 messages=[],
                 user_message=f"주제: {topic}",
@@ -107,14 +126,18 @@ async def run_agent1_turn(session_id: str, topic: str, category: str):
                 category=category
             ):
                 full_response += chunk
+                chunk_count += 1
                 await sse_event_manager.emit(
                     session_id,
                     EventType.MESSAGE_STREAM_CHUNK,
                     {"text": chunk}
                 )
+            logger.info(f"[Agent1Turn] 스트리밍 완료 - chunks={chunk_count}, response_len={len(full_response)}")
             return full_response
         
+        logger.info(f"[Agent1Turn] turn_manager.execute_turn 호출")
         response = await turn_manager.execute_turn(session_id, agent1_turn)
+        logger.info(f"[Agent1Turn] execute_turn 완료 - response={response[:100] if response else 'None'}...")
         
         # 스트리밍 종료 알림
         await sse_event_manager.emit(
@@ -122,17 +145,20 @@ async def run_agent1_turn(session_id: str, topic: str, category: str):
             EventType.MESSAGE_STREAM_END,
             {"message_id": f"agent1-{session_id}-{session.round_index}"}
         )
+        logger.info(f"[Agent1Turn] MESSAGE_STREAM_END 이벤트 발송 완료")
         
         # TODO: 향후 CaseFile에 대화 기록 저장 로직 추가
         # if case_file and response:
         #     case_file.add_turn("agent1", response)
         
     except Exception as e:
+        logger.error(f"[Agent1Turn] 오류 발생 - {type(e).__name__}: {str(e)}", exc_info=True)
         await sse_event_manager.emit(
             session_id,
             EventType.ERROR,
             {"error": str(e)}
         )
+
 
 @router.post("/sessions", response_model=CreateSessionResponse)
 async def create_session(request: CreateSessionRequest, background_tasks: BackgroundTasks):
@@ -141,10 +167,13 @@ async def create_session(request: CreateSessionRequest, background_tasks: Backgr
     
     세션 생성 후 Agent 1이 자동으로 첫 발언을 시작합니다.
     """
+    logger.info(f"[CreateSession] 요청 수신 - category={request.category}, topic={request.topic}")
+    
     # 카테고리 검증
     try:
         category = Category(request.category)
     except ValueError:
+        logger.error(f"[CreateSession] 잘못된 카테고리 - {request.category}")
         raise HTTPException(
             status_code=400,
             detail=f"Invalid category: {request.category}. Valid: newbiz, marketing, dev, domain"
@@ -155,17 +184,22 @@ async def create_session(request: CreateSessionRequest, background_tasks: Backgr
         category=category,
         topic=request.topic
     )
+    logger.info(f"[CreateSession] 세션 생성됨 - session_id={session.id}")
     
     # 상태 머신에 등록
     state_machine.create_session(session)
     sessions_store[session.id] = session
+    logger.info(f"[CreateSession] 상태 머신에 등록됨 - sessions_store_size={len(sessions_store)}")
     
     # CaseFile 초기화
     case_file = CaseFile(session_id=session.id)
     case_files_store[session.id] = case_file
+    logger.info(f"[CreateSession] CaseFile 초기화됨")
     
     # Agent 1 자동 시작 (백그라운드)
+    logger.info(f"[CreateSession] 백그라운드 태스크 등록 시작 - run_agent1_turn")
     background_tasks.add_task(run_agent1_turn, session.id, request.topic, request.category)
+    logger.info(f"[CreateSession] 백그라운드 태스크 등록 완료")
     
     return CreateSessionResponse(
         session_id=session.id,
