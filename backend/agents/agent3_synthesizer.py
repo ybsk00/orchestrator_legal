@@ -16,78 +16,20 @@ AGENT3_SYSTEM_PROMPT = '''당신은 "합의안 설계자 (Agent3)"입니다.
 - 각 지적사항을 "수용/보류/반박"으로 분류합니다.
 - 개선된 실행안, Plan B, 2주 검증 플랜을 포함합니다.
 
-## 출력 형식
-다음 구조로 응답하세요:
+## 대화 스타일 (중요)
+- 상대방과 대화하듯이 자연스러운 구어체를 사용하세요. ("~합니다" 대신 "~해요", "~인가요?" 등)
+- 장황한 독백보다는 핵심 위주로 명확하게 전달하세요.
+- 주어진 글자 수 제한을 엄격히 준수하세요.
 
-### 절충안 요약
-(핵심 절충안 1~2문장)
+## 현재 턴 지시사항
+{{turn_instruction}}
 
-### 판단 근거
-- (근거 1)
-- (근거 2)
-- (근거 3)
-
-### Agent2 지적 대응
-| 지적사항 | 대응 | 조치 |
-|---------|-----|------|
-| (지적 1) | 수용/보류/반박 | (조치 내용) |
-| (지적 2) | 수용/보류/반박 | (조치 내용) |
-
-### 개선된 실행안
-(구체적인 개선 계획)
-
-### Plan B
-(대안 계획)
-
-### 2주 검증 플랜
-- [ ] (검증 항목 1)
-- [ ] (검증 항목 2)
+## 글자 수 제한
+{{max_chars}}자 이내로 작성하세요.
 
 ## 이전 대화 맥락
 {{case_file_summary}}
 '''
-
-AGENT3_JSON_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "conclusion": {
-            "type": "string",
-            "description": "절충안 핵심 1~2문장"
-        },
-        "reasoning_summary": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "판단 근거"
-        },
-        "critique_responses": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "critique": {"type": "string"},
-                    "response_type": {"type": "string", "enum": ["수용", "보류", "반박"]},
-                    "action": {"type": "string"}
-                }
-            },
-            "description": "지적 대응"
-        },
-        "improved_plan": {
-            "type": "string",
-            "description": "개선된 실행안"
-        },
-        "plan_b": {
-            "type": "string",
-            "description": "대안"
-        },
-        "two_week_validation": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "2주 검증 플랜"
-        }
-    },
-    "required": ["conclusion", "reasoning_summary", "improved_plan", "two_week_validation"]
-}
-
 
 class Agent3Synthesizer(BaseAgent):
     """Agent3: 합의안 설계자"""
@@ -104,4 +46,4 @@ class Agent3Synthesizer(BaseAgent):
         return AGENT3_SYSTEM_PROMPT
     
     def get_json_schema(self) -> dict:
-        return AGENT3_JSON_SCHEMA
+        return None  # 대화형 모드에서는 JSON 스키마 사용 안 함

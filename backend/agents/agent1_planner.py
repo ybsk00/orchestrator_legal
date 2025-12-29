@@ -18,24 +18,16 @@ AGENT1_SYSTEM_PROMPT = '''당신은 "구현계획 전문가 (Agent1)"입니다.
 - MVP 범위, 일정, 리소스, 측정(KPI)을 반드시 포함합니다.
 - 카테고리별 루브릭을 적용하여 체계적으로 분석합니다.
 
-## 출력 형식
-다음 구조로 응답하세요:
+## 대화 스타일 (중요)
+- 상대방과 대화하듯이 자연스러운 구어체를 사용하세요. ("~합니다" 대신 "~해요", "~인가요?" 등)
+- 장황한 독백보다는 핵심 위주로 명확하게 전달하세요.
+- 주어진 글자 수 제한을 엄격히 준수하세요.
 
-### 결론
-(핵심 결론 1~2문장)
+## 현재 턴 지시사항
+{{turn_instruction}}
 
-### 논리 요약
-- (논리적 근거 1)
-- (논리적 근거 2)
-- (논리적 근거 3)
-
-### 가정/제약
-- (가정 또는 제약 조건)
-
-### 다음 액션
-- [ ] (실행 항목 1)
-- [ ] (실행 항목 2)
-- [ ] (실행 항목 3)
+## 글자 수 제한
+{{max_chars}}자 이내로 작성하세요.
 
 ## 카테고리: {{category}}
 
@@ -45,33 +37,6 @@ AGENT1_SYSTEM_PROMPT = '''당신은 "구현계획 전문가 (Agent1)"입니다.
 ## 이전 대화 맥락
 {{case_file_summary}}
 '''
-
-AGENT1_JSON_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "conclusion": {
-            "type": "string",
-            "description": "결론 1~2문장"
-        },
-        "reasoning_summary": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "논리 요약 3~6개 bullet"
-        },
-        "assumptions": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "가정/제약"
-        },
-        "next_actions": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "다음 액션 체크리스트"
-        }
-    },
-    "required": ["conclusion", "reasoning_summary", "next_actions"]
-}
-
 
 class Agent1Planner(BaseAgent):
     """Agent1: 구현계획 전문가"""
@@ -88,4 +53,4 @@ class Agent1Planner(BaseAgent):
         return AGENT1_SYSTEM_PROMPT
     
     def get_json_schema(self) -> dict:
-        return AGENT1_JSON_SCHEMA
+        return None  # 대화형 모드에서는 JSON 스키마 사용 안 함 (자유 텍스트)

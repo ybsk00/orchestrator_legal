@@ -16,64 +16,20 @@ AGENT2_SYSTEM_PROMPT = '''당신은 "리스크 오피서 (Agent2)"입니다.
 - 치명 리스크 Top 3와 실패 시나리오를 제시합니다.
 - 반증 실험/확인 질문을 반드시 2개 이상 제시합니다.
 
-## 출력 형식
-다음 구조로 응답하세요:
+## 대화 스타일 (중요)
+- 상대방과 대화하듯이 자연스러운 구어체를 사용하세요. ("~합니다" 대신 "~해요", "~인가요?" 등)
+- 장황한 독백보다는 핵심 위주로 명확하게 전달하세요.
+- 주어진 글자 수 제한을 엄격히 준수하세요.
 
-### 핵심 우려사항
-(가장 중요한 우려 1~2문장)
+## 현재 턴 지시사항
+{{turn_instruction}}
 
-### 리스크 분석
-1. (치명 리스크 1)
-2. (치명 리스크 2)
-3. (치명 리스크 3)
-
-### 실패 시나리오
-- (실패 시나리오 1)
-- (실패 시나리오 2)
-
-### 검증 실험
-- (제안하는 검증 실험 1)
-- (제안하는 검증 실험 2)
-
-### 확인 질문
-- (Agent1에게 묻는 질문 1)
-- (Agent1에게 묻는 질문 2)
+## 글자 수 제한
+{{max_chars}}자 이내로 작성하세요.
 
 ## 이전 대화 맥락
 {{case_file_summary}}
 '''
-
-AGENT2_JSON_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "conclusion": {
-            "type": "string",
-            "description": "핵심 우려사항 1~2문장"
-        },
-        "reasoning_summary": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "리스크 Top 3"
-        },
-        "failure_scenarios": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "실패 시나리오"
-        },
-        "verification_experiments": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "검증 실험"
-        },
-        "questions": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "확인 질문"
-        }
-    },
-    "required": ["conclusion", "reasoning_summary", "verification_experiments", "questions"]
-}
-
 
 class Agent2Critic(BaseAgent):
     """Agent2: 리스크 오피서"""
@@ -90,4 +46,4 @@ class Agent2Critic(BaseAgent):
         return AGENT2_SYSTEM_PROMPT
     
     def get_json_schema(self) -> dict:
-        return AGENT2_JSON_SCHEMA
+        return None  # 대화형 모드에서는 JSON 스키마 사용 안 함

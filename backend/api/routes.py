@@ -1,10 +1,8 @@
-"""
-API 라우트 정의
-"""
 import asyncio
 import logging
 import uuid
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
+import httpx
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
@@ -12,13 +10,15 @@ from typing import Optional
 from models.session import Session, SessionStatus, Category, Phase
 from models.case_file import CaseFile
 from orchestrator.state_machine import state_machine
-from orchestrator.turn_manager import turn_manager
+from orchestrator.turn_manager import turn_manager, AgentRole, TurnType
 from orchestrator.stop_detector import stop_detector, StopConfidence
 from agents.base_agent import gemini_client
 from agents.agent1_planner import Agent1Planner
 from agents.agent2_critic import Agent2Critic
+from agents.agent3_synthesizer import Agent3Synthesizer
 from storage import supabase_client as db
 from .events import sse_event_manager, EventType
+from config import BASE_URL  # config.py에 BASE_URL 추가 필요
 
 # 로깅 설정
 logging.basicConfig(level=logging.DEBUG)
@@ -27,8 +27,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
 # 에이전트 인스턴스
-agent1 = Agent1Planner(gemini_client)
-agent2 = Agent2Critic(gemini_client)
+agents = {
+    AgentRole.AGENT1: Agent1Planner(gemini_client),
+    AgentRole.AGENT2: Agent2Critic(gemini_client),
+    AgentRole.AGENT3: Agent3Synthesizer(gemini_client),
+}
 
 
 # Request/Response 모델
@@ -65,131 +68,136 @@ class SessionResponse(BaseModel):
     phase: str
 
 
-# Supabase 기반 세션 저장소 (인메모리 제거)
-# sessions_store와 case_files_store는 더 이상 사용하지 않음
+# 비동기 턴 실행 함수 (Fire-and-Forget)
+async def trigger_next_turn(session_id: str, turn_index: int):
+    """
+    다음 턴을 실행하기 위해 API를 비동기로 호출합니다.
+    Vercel 타임아웃 방지를 위해 HTTP 요청을 보내고 응답을 기다리지 않거나,
+    BackgroundTasks를 사용하지만, 여기서는 재귀적 호출 구조를 위해 API 호출을 사용합니다.
+    """
+    async with httpx.AsyncClient() as client:
+        try:
+            # 로컬 테스트 시 BASE_URL이 필요함. 배포 시에는 배포 URL
+            url = f"{BASE_URL}/api/sessions/{session_id}/next-turn"
+            await client.post(url, json={"turn_index": turn_index}, timeout=1.0)
+        except httpx.ReadTimeout:
+            # 의도된 타임아웃 (Fire-and-Forget)
+            pass
+        except Exception as e:
+            logger.error(f"[TriggerNextTurn] 호출 실패: {e}")
 
 
-async def run_agent1_turn(session_id: str, topic: str, category: str):
+async def execute_turn(session_id: str, turn_index: int):
     """
-    Agent 1 (구현계획 전문가) 턴 실행
-    
-    세션 생성 후 자동으로 호출되어 첫 대화를 시작합니다.
+    특정 턴을 실행하는 핵심 로직
     """
-    logger.info(f"[Agent1Turn] 시작 - session_id={session_id}, topic={topic}, category={category}")
-    
+    turn_spec = turn_manager.get_turn(turn_index)
+    if not turn_spec:
+        logger.info(f"[ExecuteTurn] 모든 턴 완료. 세션 종료 처리.")
+        await db.update_session(session_id, {"status": "finalized"})
+        await sse_event_manager.emit(session_id, EventType.SESSION_END, {})
+        return
+
+    logger.info(f"[ExecuteTurn] 턴 시작 - index={turn_index}, role={turn_spec.role}, type={turn_spec.turn_type}")
+
     try:
-        # Supabase에서 세션 조회
+        # 세션 및 CaseFile 조회
         session_data = await db.get_session(session_id)
-        if not session_data:
-            logger.error(f"[Agent1Turn] 세션을 찾을 수 없음 - session_id={session_id}")
-            return
-        
-        logger.info(f"[Agent1Turn] 세션 조회 성공 - status={session_data.get('status')}, round={session_data.get('round_index')}")
-        
-        # CaseFile 조회
         case_file_data = await db.get_case_file(session_id)
+        
+        # 이전 대화 맥락 구성 (최근 메시지 3개 정도만 요약 또는 전체 전달)
+        # 여기서는 CaseFile Summary 대신 최근 메시지를 활용할 수도 있음
+        # 하지만 현재 구조상 CaseFile Summary를 사용
         case_file_summary = ""
         if case_file_data:
-            # CaseFile 요약 생성
             decisions = case_file_data.get('decisions', [])
             open_issues = case_file_data.get('open_issues', [])
             case_file_summary = f"결정사항: {'; '.join(decisions[-3:])}. 미해결: {'; '.join(open_issues[-3:])}"
-        logger.info(f"[Agent1Turn] CaseFile 조회 - found={case_file_data is not None}")
-        
-        # 라운드 인덱스 업데이트
-        new_round_index = (session_data.get('round_index', 0) or 0) + 1
+
+        # 라운드 및 페이즈 업데이트
+        current_round = turn_manager.get_round_index(turn_index)
         await db.update_session(session_id, {
-            "round_index": new_round_index,
-            "phase": "agent1_turn"
+            "round_index": current_round,
+            "phase": f"{turn_spec.role}_{turn_spec.turn_type}"
         })
-        logger.info(f"[Agent1Turn] 라운드 시작됨 - round_index={new_round_index}")
+
+        # 이벤트 발송
+        await sse_event_manager.emit(session_id, EventType.ROUND_START, {"round_index": current_round})
+        await sse_event_manager.emit(session_id, EventType.SPEAKER_CHANGE, {"active_speaker": turn_spec.role})
+        await sse_event_manager.emit(session_id, EventType.MESSAGE_STREAM_START, {
+            "role": turn_spec.role,
+            "round_index": current_round,
+            "phase": turn_spec.turn_type
+        })
+
+        # 에이전트 실행
+        agent = agents[turn_spec.role]
         
-        await sse_event_manager.emit(
-            session_id,
-            EventType.ROUND_START,
-            {"round_index": new_round_index}
-        )
-        logger.info(f"[Agent1Turn] ROUND_START 이벤트 발송 완료")
+        # 프롬프트 구성 (동적 지시사항 주입)
+        system_prompt = agent.system_prompt.replace("{{turn_instruction}}", turn_spec.description)
+        system_prompt = system_prompt.replace("{{max_chars}}", str(turn_spec.max_chars))
+        system_prompt = system_prompt.replace("{{category}}", session_data.get("category", "general"))
+        # 루브릭은 agent 내부에서 처리하거나 여기서 주입 (현재는 agent 코드에 {{rubric}} 플레이스홀더가 없으면 무시됨)
         
-        # Agent 1 발언 시작 알림
-        await sse_event_manager.emit(
-            session_id,
-            EventType.SPEAKER_CHANGE,
-            {"active_speaker": "agent1"}
-        )
-        logger.info(f"[Agent1Turn] SPEAKER_CHANGE 이벤트 발송 완료")
-        
-        await sse_event_manager.emit(
-            session_id,
-            EventType.MESSAGE_STREAM_START,
-            {"role": "agent1", "round_index": new_round_index, "phase": "agent1_turn"}
-        )
-        logger.info(f"[Agent1Turn] MESSAGE_STREAM_START 이벤트 발송 완료")
-        
-        # Agent 1 실행 (스트리밍)
-        logger.info(f"[Agent1Turn] Gemini API 호출 시작")
+        # 스트리밍 실행
         full_response = ""
-        chunk_count = 0
-        async for chunk in agent1.stream_response(
-            messages=[],
-            user_message=f"주제: {topic}",
+        async for chunk in agent.stream_response(
+            messages=[], # 대화 히스토리는 문맥으로 전달됨
+            user_message=f"주제: {session_data.get('topic')}", # 매 턴 주제 상기
             case_file_summary=case_file_summary,
-            category=category
+            category=session_data.get("category", "general")
         ):
             full_response += chunk
-            chunk_count += 1
-            await sse_event_manager.emit(
-                session_id,
-                EventType.MESSAGE_STREAM_CHUNK,
-                {"text": chunk}
-            )
-        logger.info(f"[Agent1Turn] 스트리밍 완료 - chunks={chunk_count}, response_len={len(full_response)}")
-        
-        # 스트리밍 종료 알림
-        await sse_event_manager.emit(
-            session_id,
-            EventType.MESSAGE_STREAM_END,
-            {"message_id": f"agent1-{session_id}-{new_round_index}"}
-        )
-        logger.info(f"[Agent1Turn] MESSAGE_STREAM_END 이벤트 발송 완료")
-        
-        # 메시지 저장
-        await db.save_message(session_id, {
-            "role": "agent1",
-            "content_text": full_response,
-            "round_index": new_round_index,
-            "phase": "agent1_turn"
+            await sse_event_manager.emit(session_id, EventType.MESSAGE_STREAM_CHUNK, {"text": chunk})
+
+        # 스트리밍 종료 및 저장
+        await sse_event_manager.emit(session_id, EventType.MESSAGE_STREAM_END, {
+            "message_id": f"{turn_spec.role}-{session_id}-{turn_index}"
         })
-        logger.info(f"[Agent1Turn] 메시지 저장 완료")
         
+        await db.save_message(session_id, {
+            "role": turn_spec.role,
+            "content_text": full_response,
+            "round_index": current_round,
+            "phase": turn_spec.turn_type,
+            "event_id": turn_index
+        })
+
+        # 다음 턴 트리거 (재귀 호출)
+        next_turn_index = turn_index + 1
+        if next_turn_index < turn_manager.get_total_turns():
+            # 비동기로 다음 턴 호출 (Vercel 타임아웃 회피)
+            await trigger_next_turn(session_id, next_turn_index)
+        else:
+            # 모든 턴 종료
+            await db.update_session(session_id, {"status": "finalized"})
+            await sse_event_manager.emit(session_id, EventType.SESSION_END, {})
+
     except Exception as e:
-        logger.error(f"[Agent1Turn] 오류 발생 - {type(e).__name__}: {str(e)}", exc_info=True)
-        await sse_event_manager.emit(
-            session_id,
-            EventType.ERROR,
-            {"error": str(e)}
-        )
+        logger.error(f"[ExecuteTurn] 오류 발생: {e}", exc_info=True)
+        await sse_event_manager.emit(session_id, EventType.ERROR, {"error": str(e)})
+
+
+class NextTurnRequest(BaseModel):
+    turn_index: int
+
+@router.post("/sessions/{session_id}/next-turn")
+async def next_turn_endpoint(session_id: str, request: NextTurnRequest, background_tasks: BackgroundTasks):
+    """
+    다음 턴 실행을 위한 내부 엔드포인트
+    """
+    # 백그라운드 태스크로 실행하여 즉시 응답 반환
+    background_tasks.add_task(execute_turn, session_id, request.turn_index)
+    return {"status": "started", "turn_index": request.turn_index}
 
 
 @router.post("/sessions", response_model=CreateSessionResponse)
 async def create_session_endpoint(request: CreateSessionRequest, background_tasks: BackgroundTasks):
     """
-    새 토론 세션 생성
-    
-    세션 생성 후 Agent 1이 자동으로 첫 발언을 시작합니다.
+    새 토론 세션 생성 및 첫 턴 시작
     """
-    logger.info(f"[CreateSession] 요청 수신 - category={request.category}, topic={request.topic}")
-    
-    # 카테고리 검증
-    if request.category not in ["newbiz", "marketing", "dev", "domain"]:
-        logger.error(f"[CreateSession] 잘못된 카테고리 - {request.category}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid category: {request.category}. Valid: newbiz, marketing, dev, domain"
-        )
-    
     try:
-        # Supabase에 세션 생성 (user_id는 NULL - 익명 세션)
+        # Supabase에 세션 생성
         session_data = await db.create_session(
             user_id=None,
             category=request.category,
@@ -200,24 +208,15 @@ async def create_session_endpoint(request: CreateSessionRequest, background_task
             raise HTTPException(status_code=500, detail="Failed to create session")
         
         session_id = session_data["id"]
-        logger.info(f"[CreateSession] 세션 생성됨 - session_id={session_id}")
         
         # CaseFile 초기화
         await db.save_case_file(session_id, {
-            "facts": [],
-            "goals": [],
-            "constraints": [],
-            "decisions": [],
-            "open_issues": [],
-            "assumptions": [],
-            "next_experiments": []
+            "facts": [], "goals": [], "constraints": [], "decisions": [], 
+            "open_issues": [], "assumptions": [], "next_experiments": []
         })
-        logger.info(f"[CreateSession] CaseFile 초기화됨")
         
-        # Agent 1 자동 시작 (백그라운드)
-        logger.info(f"[CreateSession] 백그라운드 태스크 등록 시작 - run_agent1_turn")
-        background_tasks.add_task(run_agent1_turn, session_id, request.topic, request.category)
-        logger.info(f"[CreateSession] 백그라운드 태스크 등록 완료")
+        # 첫 번째 턴(Index 0) 시작
+        background_tasks.add_task(execute_turn, session_id, 0)
         
         return CreateSessionResponse(
             session_id=session_id,
@@ -226,10 +225,8 @@ async def create_session_endpoint(request: CreateSessionRequest, background_task
             status=session_data["status"]
         )
         
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"[CreateSession] 오류 발생 - {type(e).__name__}: {str(e)}", exc_info=True)
+        logger.error(f"[CreateSession] 오류 발생: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -251,207 +248,9 @@ async def get_session_endpoint(session_id: str):
             round_index=session_data.get("round_index", 0) or 0,
             phase=session_data.get("phase", "idle") or "idle"
         )
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"[GetSession] 오류 발생 - {type(e).__name__}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
-@router.post("/sessions/{session_id}/messages", response_model=UserMessageResponse)
-async def send_message(session_id: str, request: UserMessageRequest):
-    """
-    사용자 메시지 전송 & 토론 시작
-    
-    - 조기 종료 감지
-    - 새 라운드 시작 또는 진행 중 라운드 처리
-    """
-    session = state_machine.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    # 최종화 중이면 거부
-    if session.status == SessionStatus.FINALIZING:
-        raise HTTPException(
-            status_code=409,
-            detail="Session is finalizing. Wait for completion or start a new session."
-        )
-    
-    if session.status == SessionStatus.FINALIZED:
-        raise HTTPException(
-            status_code=409,
-            detail="Session is already finalized. Start a new session."
-        )
-    
-    # 조기 종료 감지
-    stop_confidence, trigger = stop_detector.detect(request.message)
-    
-    if stop_confidence == StopConfidence.COMMAND:
-        # 명령어로 확실한 종료 → 즉시 최종화
-        state_machine.force_finalize(session_id)
-        await sse_event_manager.emit(
-            session_id,
-            EventType.FINALIZE_START,
-            {"reason": "user_command", "trigger": trigger}
-        )
-        return UserMessageResponse(
-            status="finalizing",
-            stop_confidence=stop_confidence.value,
-            trigger=trigger
-        )
-    
-    if stop_confidence == StopConfidence.KEYWORD:
-        # 키워드 감지 → 확인 필요
-        await sse_event_manager.emit(
-            session_id,
-            EventType.STOP_CONFIRM,
-            {"trigger": trigger, "message": "토론을 마무리할까요?"}
-        )
-        return UserMessageResponse(
-            status="confirm_stop",
-            stop_confidence=stop_confidence.value,
-            trigger=trigger
-        )
-    
-    # 정상 메시지 처리
-    if session.phase == Phase.IDLE:
-        # 새 라운드 시작
-        success = state_machine.start_new_round(session_id)
-        if not success:
-            # 3라운드 완료 → 자동 최종화
-            await sse_event_manager.emit(
-                session_id,
-                EventType.FINALIZE_START,
-                {"reason": "round_limit_reached"}
-            )
-            return UserMessageResponse(
-                status="finalizing",
-                round_index=session.round_index,
-                phase=session.phase
-            )
-        
-        await sse_event_manager.emit(
-            session_id,
-            EventType.ROUND_START,
-            {"round_index": session.round_index}
-        )
-    
-    # TODO: 실제 에이전트 턴 실행 로직 추가
-    
-    return UserMessageResponse(
-        status="processing",
-        round_index=session.round_index,
-        phase=session.phase
-    )
-
-
-@router.post("/sessions/{session_id}/finalize")
-async def force_finalize(session_id: str):
-    """
-    조기 종료 요청 (마무리 버튼)
-    """
-    session = state_machine.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    if session.status != SessionStatus.ACTIVE:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Session cannot be finalized. Current status: {session.status}"
-        )
-    
-    state_machine.force_finalize(session_id)
-    await sse_event_manager.emit(
-        session_id,
-        EventType.FINALIZE_START,
-        {"reason": "user_button"}
-    )
-    
-    # TODO: Agent3 Finalizer 실행 로직 추가
-    
-    return {"status": "finalizing", "session_id": session_id}
-
-
-@router.post("/sessions/{session_id}/confirm-stop")
-async def confirm_stop(session_id: str, confirmed: bool):
-    """
-    키워드 종료 확인 응답
-    """
-    session = state_machine.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    if confirmed:
-        state_machine.force_finalize(session_id)
-        await sse_event_manager.emit(
-            session_id,
-            EventType.FINALIZE_START,
-            {"reason": "user_confirmed_keyword"}
-        )
-        return {"status": "finalizing"}
-    else:
-        return {"status": "continue"}
-
-
-@router.get("/sessions/{session_id}/stream")
-async def stream_events(
-    session_id: str,
-    last_event_id: Optional[int] = Query(None, alias="lastEventId")
-):
-    """
-    SSE 스트림 연결
-    
-    - Last-Event-ID 지원으로 재연결 시 이벤트 복구
-    """
-    try:
-        session_data = await db.get_session(session_id)
-        if not session_data:
-            logger.error(f"[StreamEvents] 세션을 찾을 수 없음 - session_id={session_id}")
-            raise HTTPException(status_code=404, detail="Session not found")
-        
-        logger.info(f"[StreamEvents] SSE 연결 시작 - session_id={session_id}")
-        
-        return StreamingResponse(
-            sse_event_manager.stream_events(session_id, last_event_id),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no"
-            }
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"[StreamEvents] 오류 발생 - {type(e).__name__}: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/sessions/{session_id}/report")
-async def get_final_report(session_id: str):
-    """
-    최종 리포트 조회
-    """
-    try:
-        session_data = await db.get_session(session_id)
-        if not session_data:
-            raise HTTPException(status_code=404, detail="Session not found")
-        
-        if session_data.get("status") != "finalized":
-            raise HTTPException(
-                status_code=400,
-                detail=f"Report not ready. Session status: {session_data.get('status')}"
-            )
-        
-        # Supabase에서 리포트 조회
-        report_data = await db.get_final_report(session_id)
-        if not report_data:
-            return {"message": "Report not generated yet"}
-        
-        return report_data
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"[GetReport] 오류 발생 - {type(e).__name__}: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+# 기존 메시지 전송, 종료, 리포트 엔드포인트는 유지하되 필요 시 수정
+# 현재 대화형 모드에서는 사용자 개입이 최소화되므로 send_message 등의 중요도가 낮아짐

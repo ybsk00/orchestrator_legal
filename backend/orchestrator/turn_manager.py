@@ -1,101 +1,62 @@
-"""
-턴 관리자 - 동시성 제어 및 턴 실행
+from typing import Dict, Optional, List
+from enum import Enum
 
-핵심 보완사항 반영:
-- 세션별 락으로 동시에 1턴만 실행
-- 최종화 중 추가 메시지 거부
-- 취소된 세션 처리
-"""
-import asyncio
-from typing import Callable, Any, Optional
+class AgentRole(str, Enum):
+    AGENT1 = "agent1"
+    AGENT2 = "agent2"
+    AGENT3 = "agent3"
 
-from models.session import SessionStatus
-from .state_machine import state_machine
+class TurnType(str, Enum):
+    PLAN = "plan"
+    CRITIQUE = "critique"
+    COMPROMISE = "compromise"
+    DEFENSE = "defense"
+    REBUTTAL = "rebuttal"
+    FINAL_REPORT = "final_report"
 
+class TurnSpec:
+    def __init__(self, role: AgentRole, turn_type: TurnType, description: str, max_chars: int):
+        self.role = role
+        self.turn_type = turn_type
+        self.description = description
+        self.max_chars = max_chars
 
 class TurnManager:
-    """
-    턴 실행 관리자
-    
-    - 세션별 락으로 동시에 1턴만 실행
-    - 최종화 중 추가 메시지 거부
-    - 취소 토큰 확인
-    """
-    
-    async def execute_turn(
-        self, 
-        session_id: str, 
-        turn_func: Callable[[], Any]
-    ) -> Optional[Any]:
-        """
-        세션별 락으로 동시에 1턴만 실행
-        
-        Args:
-            session_id: 세션 ID
-            turn_func: 실행할 턴 함수
+    def __init__(self):
+        # 3라운드 9단계 대화 시나리오 정의
+        self.turns: List[TurnSpec] = [
+            # Round 1
+            TurnSpec(AgentRole.AGENT1, TurnType.PLAN, "초기 구현 계획 제시", 500),
+            TurnSpec(AgentRole.AGENT2, TurnType.CRITIQUE, "핵심 비판 및 리스크 지적", 300),
+            TurnSpec(AgentRole.AGENT3, TurnType.COMPROMISE, "1차 절충안 제시", 300),
             
-        Returns:
-            턴 실행 결과 또는 None (취소/거부 시)
+            # Round 2
+            TurnSpec(AgentRole.AGENT2, TurnType.REBUTTAL, "절충안에 대한 추가 반박", 300),
+            TurnSpec(AgentRole.AGENT1, TurnType.DEFENSE, "비판에 대한 방어 및 보완책", 300),
+            TurnSpec(AgentRole.AGENT3, TurnType.COMPROMISE, "2차 절충안 및 방향성 정리", 300),
             
-        Raises:
-            RuntimeError: 최종화 중 추가 메시지 거부
-        """
-        session = state_machine.get_session(session_id)
-        lock = state_machine.get_lock(session_id)
-        
-        if not session or not lock:
-            raise ValueError(f"Session not found: {session_id}")
-        
-        # 최종화 중이면 추가 메시지 거부
-        if session.status == SessionStatus.FINALIZING:
-            raise RuntimeError("Session is finalizing, no more messages allowed")
-        
-        if session.status == SessionStatus.FINALIZED:
-            raise RuntimeError("Session is already finalized")
-        
-        async with lock:
-            # 락 획득 후 다시 확인 (레이스 컨디션 방지)
-            if state_machine.is_aborted(session_id):
-                return None
-            
-            try:
-                result = await turn_func()
-                return result
-            except asyncio.CancelledError:
-                # 조기 종료로 인한 취소
-                return None
-    
-    async def execute_finalization(
-        self,
-        session_id: str,
-        finalize_func: Callable[[], Any]
-    ) -> Optional[Any]:
-        """
-        최종화 실행 (Agent3 Finalizer)
-        
-        Args:
-            session_id: 세션 ID
-            finalize_func: 최종화 함수
-            
-        Returns:
-            최종 리포트 또는 None
-        """
-        session = state_machine.get_session(session_id)
-        lock = state_machine.get_lock(session_id)
-        
-        if not session or not lock:
-            raise ValueError(f"Session not found: {session_id}")
-        
-        async with lock:
-            try:
-                result = await finalize_func()
-                state_machine.complete_finalization(session_id)
-                return result
-            except Exception as e:
-                # 최종화 실패 시에도 상태는 finalized로
-                state_machine.complete_finalization(session_id)
-                raise e
+            # Round 3
+            TurnSpec(AgentRole.AGENT2, TurnType.REBUTTAL, "마지막 점검 및 우려사항", 300),
+            TurnSpec(AgentRole.AGENT1, TurnType.DEFENSE, "최종 실행 의지 및 해결책", 300),
+            TurnSpec(AgentRole.AGENT3, TurnType.FINAL_REPORT, "최종 합의안 및 리포트 작성", 1500),
+        ]
 
+    def get_turn(self, turn_index: int) -> Optional[TurnSpec]:
+        """
+        특정 인덱스의 턴 정보를 반환합니다. (0-based index)
+        범위를 벗어나면 None을 반환합니다.
+        """
+        if 0 <= turn_index < len(self.turns):
+            return self.turns[turn_index]
+        return None
 
-# 싱글톤 인스턴스
+    def get_total_turns(self) -> int:
+        return len(self.turns)
+
+    def get_round_index(self, turn_index: int) -> int:
+        """
+        턴 인덱스를 기반으로 현재 라운드(1, 2, 3)를 반환합니다.
+        """
+        return (turn_index // 3) + 1
+
 turn_manager = TurnManager()
