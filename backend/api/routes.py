@@ -262,5 +262,72 @@ async def get_session_endpoint(session_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class FinalReportResponse(BaseModel):
+    report_json: dict
+    report_md: str
+
+
+@router.get("/sessions/{session_id}/report", response_model=FinalReportResponse)
+async def get_final_report(session_id: str):
+    """최종 리포트 조회"""
+    report = await db.get_final_report(session_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report
+
+
+@router.post("/sessions/{session_id}/report/generate", response_model=FinalReportResponse)
+async def generate_report(session_id: str):
+    """최종 리포트 생성 (On-Demand)"""
+    # 1. 세션 및 메시지 조회
+    session = await db.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    messages = await db.get_messages(session_id)
+    if not messages:
+        raise HTTPException(status_code=400, detail="No messages to summarize")
+
+    # 2. 프롬프트 구성
+    conversation_text = ""
+    for msg in messages:
+        role = msg.get("role", "unknown")
+        content = msg.get("content_text", "")
+        conversation_text += f"{role}: {content}\n\n"
+
+    prompt = f"""
+    다음은 3명의 AI 에이전트(Agent 1: 계획, Agent 2: 비판, Agent 3: 종합)가 나눈 토론 내용입니다.
+    이 내용을 바탕으로 최종 결론 보고서를 작성해주세요.
+    
+    [토론 내용]
+    {conversation_text}
+    
+    [작성 양식]
+    1. **종합 결론**: 토론의 핵심 결과 요약
+    2. **실행 방안**: 구체적인 실행 단계 및 계획
+    3. **구현 방향**: 기술적/실무적 구현 가이드
+    
+    분량은 공백 포함 1500자 내외로 상세하게 작성해주세요.
+    """
+
+    # 3. Gemini 호출
+    try:
+        response = await gemini_client.generate_content(prompt)
+        report_content = response.text
+    except Exception as e:
+        logger.error(f"Failed to generate report: {e}")
+        raise HTTPException(status_code=500, detail=f"Report generation failed: {str(e)}")
+
+    # 4. 저장
+    report_data = {
+        "report_json": {"content": report_content},
+        "report_md": report_content
+    }
+    await db.save_final_report(session_id, report_data)
+    
+    return report_data
+
+
+
 # 기존 메시지 전송, 종료, 리포트 엔드포인트는 유지하되 필요 시 수정
 # 현재 대화형 모드에서는 사용자 개입이 최소화되므로 send_message 등의 중요도가 낮아짐

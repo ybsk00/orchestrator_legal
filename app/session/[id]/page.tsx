@@ -117,23 +117,9 @@ export default function SessionPage() {
         }
     }
 
-    const [showReportModal, setShowReportModal] = useState(false)
-    const [reportContent, setReportContent] = useState('')
-
-    // 리포트 조회
-    const handleViewReport = async () => {
-        try {
-            const res = await fetch(`/api/sessions/${sessionId}/report`)
-            if (res.ok) {
-                const data = await res.json()
-                setReportContent(data.report_md || '리포트 내용이 없습니다.')
-                setShowReportModal(true)
-            } else {
-                alert('리포트를 불러오는데 실패했습니다.')
-            }
-        } catch (error) {
-            console.error('Failed to fetch report:', error)
-        }
+    // 리포트 페이지 열기 (새 창)
+    const handleViewReport = () => {
+        window.open(`/session/${sessionId}/report`, '_blank', 'width=900,height=800')
     }
 
     const getAgentLabel = (role: string) => {
@@ -156,7 +142,7 @@ export default function SessionPage() {
                 </div>
                 <div className={styles.headerActions}>
                     <span className={styles.roundBadge}>
-                        라운드 {session?.round_index || 0}/3
+                        라운드 {session?.round_index || 0}/5
                     </span>
                     <span className={`${styles.connectionStatus} ${isConnected ? styles.connected : ''}`}>
                         {isConnected ? '● 연결됨' : '○ 연결 중...'}
@@ -164,7 +150,7 @@ export default function SessionPage() {
 
                     {session?.status === 'finalized' ? (
                         <button className={styles.reportBtn} onClick={handleViewReport}>
-                            📑 최종 리포트 보기
+                            📑 최종 리포트 생성/보기
                         </button>
                     ) : (
                         <button className={styles.finalizeBtn} onClick={handleFinalize}>
@@ -176,14 +162,14 @@ export default function SessionPage() {
 
             {/* 메인 컨텐츠: 아바타 패널 + 채팅 */}
             <div className={styles.contentWrapper}>
-                {/* 좌측: 캐릭터 카드 패널 (40%) */}
+                {/* 좌측: 캐릭터 카드 패널 (50%) */}
                 <div className={styles.avatarContainer}>
                     <Suspense fallback={<div className={styles.avatarPlaceholder}>캐릭터 로딩 중...</div>}>
                         <AvatarPanel activeSpeaker={activeSpeaker} />
                     </Suspense>
                 </div>
 
-                {/* 우측: 채팅 패널 (60%) */}
+                {/* 우측: 채팅 패널 (50%) */}
                 <div className={styles.chatContainer}>
                     <div className={styles.messages}>
                         {messages.map((msg) => (
@@ -240,24 +226,6 @@ export default function SessionPage() {
                             <button onClick={() => handleConfirmStop(false)}>계속 토론</button>
                             <button className={styles.primary} onClick={() => handleConfirmStop(true)}>
                                 마무리하기
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* 리포트 모달 */}
-            {showReportModal && (
-                <div className={styles.modalOverlay} onClick={() => setShowReportModal(false)}>
-                    <div className={`${styles.modal} ${styles.reportModal}`} onClick={e => e.stopPropagation()}>
-                        <h3>📑 최종 합의 리포트</h3>
-                        <div className={styles.reportContent}>
-                            {reportContent}
-                        </div>
-                        <div className={styles.modalActions}>
-                            <button onClick={() => setShowReportModal(false)}>닫기</button>
-                            <button className={styles.primary} onClick={() => navigator.clipboard.writeText(reportContent)}>
-                                복사하기
                             </button>
                         </div>
                     </div>
