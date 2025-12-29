@@ -1,7 +1,8 @@
 """
 API 라우트 정의
 """
-from fastapi import APIRouter, HTTPException, Query
+import asyncio
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
@@ -11,9 +12,16 @@ from models.case_file import CaseFile
 from orchestrator.state_machine import state_machine
 from orchestrator.turn_manager import turn_manager
 from orchestrator.stop_detector import stop_detector, StopConfidence
+from agents.base_agent import gemini_client
+from agents.agent1_planner import Agent1Planner
+from agents.agent2_critic import Agent2Critic
 from .events import sse_event_manager, EventType
 
 router = APIRouter(prefix="/api")
+
+# 에이전트 인스턴스
+agent1 = Agent1Planner(gemini_client)
+agent2 = Agent2Critic(gemini_client)
 
 
 # Request/Response 모델
@@ -55,10 +63,83 @@ sessions_store: dict[str, Session] = {}
 case_files_store: dict[str, CaseFile] = {}
 
 
+async def run_agent1_turn(session_id: str, topic: str, category: str):
+    """
+    Agent 1 (구현계획 전문가) 턴 실행
+    
+    세션 생성 후 자동으로 호출되어 첫 대화를 시작합니다.
+    """
+    session = state_machine.get_session(session_id)
+    if not session:
+        return
+    
+    case_file = case_files_store.get(session_id)
+    
+    try:
+        # 새 라운드 시작
+        state_machine.start_new_round(session_id)
+        await sse_event_manager.emit(
+            session_id,
+            EventType.ROUND_START,
+            {"round_index": session.round_index}
+        )
+        
+        # Agent 1 발언 시작 알림
+        await sse_event_manager.emit(
+            session_id,
+            EventType.SPEAKER_CHANGE,
+            {"speaker": "agent1", "role": "구현계획 전문가"}
+        )
+        
+        await sse_event_manager.emit(
+            session_id,
+            EventType.MESSAGE_STREAM_START,
+            {"speaker": "agent1"}
+        )
+        
+        # Agent 1 실행 (스트리밍)
+        async def agent1_turn():
+            full_response = ""
+            async for chunk in agent1.stream_response(
+                messages=[],
+                user_message=f"주제: {topic}",
+                case_file_summary=case_file.get_summary() if case_file else "",
+                category=category
+            ):
+                full_response += chunk
+                await sse_event_manager.emit(
+                    session_id,
+                    EventType.MESSAGE_STREAM_CHUNK,
+                    {"speaker": "agent1", "chunk": chunk}
+                )
+            return full_response
+        
+        response = await turn_manager.execute_turn(session_id, agent1_turn)
+        
+        # 스트리밍 종료 알림
+        await sse_event_manager.emit(
+            session_id,
+            EventType.MESSAGE_STREAM_END,
+            {"speaker": "agent1"}
+        )
+        
+        # TODO: 향후 CaseFile에 대화 기록 저장 로직 추가
+        # if case_file and response:
+        #     case_file.add_turn("agent1", response)
+        
+    except Exception as e:
+        await sse_event_manager.emit(
+            session_id,
+            EventType.ERROR,
+            {"error": str(e)}
+        )
+
 @router.post("/sessions", response_model=CreateSessionResponse)
-async def create_session(request: CreateSessionRequest):
+async def create_session(request: CreateSessionRequest, background_tasks: BackgroundTasks):
     """
     새 토론 세션 생성
+    
+    세션 생성 후 Agent 1이 자동으로 첫 발언을 시작합니다.
     """
     # 카테고리 검증
     try:
@@ -82,6 +163,9 @@ async def create_session(request: CreateSessionRequest):
     # CaseFile 초기화
     case_file = CaseFile(session_id=session.id)
     case_files_store[session.id] = case_file
+    
+    # Agent 1 자동 시작 (백그라운드)
+    background_tasks.add_task(run_agent1_turn, session.id, request.topic, request.category)
     
     return CreateSessionResponse(
         session_id=session.id,
