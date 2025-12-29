@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { useSSE } from '@/lib/useSSE'
+import { useRealtimeMessages, Message } from '@/lib/useRealtimeMessages'
 import styles from './page.module.css'
 
 // Avatar Panel은 클라이언트 사이드에서만 로드
@@ -11,15 +11,6 @@ const AvatarPanel = dynamic(() => import('@/components/avatar/AvatarPanel'), {
     ssr: false,
     loading: () => <div className={styles.avatarPlaceholder}>캐릭터 로딩 중...</div>
 })
-
-interface Message {
-    id: string
-    role: 'user' | 'agent1' | 'agent2' | 'agent3' | 'system'
-    content: string
-    roundIndex: number
-    phase: string
-    isStreaming?: boolean
-}
 
 interface SessionData {
     id: string
@@ -35,14 +26,15 @@ export default function SessionPage() {
     const sessionId = params.id as string
 
     const [session, setSession] = useState<SessionData | null>(null)
-    const [messages, setMessages] = useState<Message[]>([])
     const [input, setInput] = useState('')
     const [activeSpeaker, setActiveSpeaker] = useState<string | null>(null)
     const [showStopConfirm, setShowStopConfirm] = useState(false)
     const [stopTrigger, setStopTrigger] = useState('')
 
     const messagesEndRef = useRef<HTMLDivElement>(null)
-    const { isConnected, lastEvent } = useSSE(sessionId)
+
+    // Supabase Realtime 훅 사용
+    const { messages, isLoading } = useRealtimeMessages(sessionId)
 
     // 세션 정보 로드
     useEffect(() => {
@@ -58,75 +50,23 @@ export default function SessionPage() {
             }
         }
         fetchSession()
+
+        // 주기적으로 세션 상태 확인 (폴링) - 라운드 변경 등 감지용
+        const interval = setInterval(fetchSession, 3000)
+        return () => clearInterval(interval)
     }, [sessionId])
 
-    // SSE 이벤트 처리
+    // Active Speaker 자동 설정 (마지막 메시지 기준)
     useEffect(() => {
-        if (!lastEvent) return
-
-        const { type, data } = lastEvent.data
-
-        switch (type) {
-            case 'speaker_change':
-                setActiveSpeaker(data.active_speaker)
-                break
-
-            case 'message_stream_start':
-                setMessages(prev => [...prev, {
-                    id: `temp-${Date.now()}`,
-                    role: data.role,
-                    content: '',
-                    roundIndex: data.round_index,
-                    phase: data.phase,
-                    isStreaming: true,
-                }])
-                break
-
-            case 'message_stream_chunk':
-                setMessages(prev => {
-                    const newMessages = [...prev]
-                    const lastIndex = newMessages.length - 1
-                    if (lastIndex >= 0 && newMessages[lastIndex].isStreaming) {
-                        newMessages[lastIndex].content += data.text
-                    }
-                    return newMessages
-                })
-                break
-
-            case 'message_stream_end':
-                setMessages(prev => {
-                    const newMessages = [...prev]
-                    const lastIndex = newMessages.length - 1
-                    if (lastIndex >= 0) {
-                        newMessages[lastIndex].id = data.message_id
-                        newMessages[lastIndex].isStreaming = false
-                    }
-                    return newMessages
-                })
+        if (messages.length > 0) {
+            const lastMsg = messages[messages.length - 1]
+            if (['agent1', 'agent2', 'agent3'].includes(lastMsg.role)) {
+                setActiveSpeaker(lastMsg.role)
+            } else {
                 setActiveSpeaker(null)
-                break
-
-            case 'stop_confirm':
-                setStopTrigger(data.trigger)
-                setShowStopConfirm(true)
-                break
-
-            case 'finalize_start':
-                break
-
-            case 'finalize_done':
-            case 'session_end':
-                window.location.href = `/session/${sessionId}/final`
-                break
-
-            case 'round_start':
-            case 'round_end':
-                fetch(`/api/sessions/${sessionId}`)
-                    .then(res => res.json())
-                    .then(setSession)
-                break
+            }
         }
-    }, [lastEvent, sessionId])
+    }, [messages])
 
     // 스크롤 자동 이동
     useEffect(() => {
@@ -137,25 +77,19 @@ export default function SessionPage() {
     const handleSend = async () => {
         if (!input.trim()) return
 
-        const userMessage: Message = {
-            id: `user-${Date.now()}`,
-            role: 'user',
-            content: input,
-            roundIndex: session?.round_index || 0,
-            phase: 'user_input',
-        }
-
-        setMessages(prev => [...prev, userMessage])
+        const messageText = input
         setInput('')
 
         try {
             await fetch(`/api/sessions/${sessionId}/messages`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: input }),
+                body: JSON.stringify({ message: messageText }),
             })
         } catch (error) {
             console.error('Failed to send message:', error)
+            // 에러 시 입력 복구 (선택사항)
+            setInput(messageText)
         }
     }
 
