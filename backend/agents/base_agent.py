@@ -6,19 +6,27 @@
 - 재시도 로직
 """
 import json
+import os
+import logging
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator, Tuple, Callable, Optional, List
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from config import GEMINI_API_KEY, GEMINI_MODEL
 
+# 로깅 설정
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 # Google Generative AI 임포트 (설치 필요)
 try:
     from google import genai
     from google.genai import types
+    logger.info("[GeminiClient] google.genai 모듈 임포트 성공")
 except ImportError:
     genai = None
     types = None
+    logger.error("[GeminiClient] google.genai 모듈 임포트 실패")
 
 
 class GeminiClient:
@@ -29,10 +37,34 @@ class GeminiClient:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            if genai and GEMINI_API_KEY:
-                cls._instance.client = genai.Client(api_key=GEMINI_API_KEY)
+            
+            # API 키 확인 (GEMINI_API_KEY 또는 GOOGLE_API_KEY)
+            api_key = GEMINI_API_KEY or os.environ.get("GOOGLE_API_KEY")
+            
+            logger.info(f"[GeminiClient] genai 모듈: {genai is not None}")
+            logger.info(f"[GeminiClient] GEMINI_API_KEY 설정됨: {bool(GEMINI_API_KEY)}")
+            logger.info(f"[GeminiClient] GOOGLE_API_KEY 설정됨: {bool(os.environ.get('GOOGLE_API_KEY'))}")
+            logger.info(f"[GeminiClient] 사용할 API 키 존재: {bool(api_key)}")
+            
+            if genai and api_key:
+                try:
+                    cls._instance.client = genai.Client(api_key=api_key)
+                    logger.info(f"[GeminiClient] 클라이언트 초기화 성공, 모델: {GEMINI_MODEL}")
+                except Exception as e:
+                    logger.error(f"[GeminiClient] 클라이언트 초기화 실패: {e}")
+                    cls._instance.client = None
+            elif genai:
+                # API 키 없이 시도 (GOOGLE_API_KEY 환경변수 자동 감지)
+                try:
+                    cls._instance.client = genai.Client()
+                    logger.info(f"[GeminiClient] 클라이언트 초기화 성공 (환경변수 자동 감지)")
+                except Exception as e:
+                    logger.error(f"[GeminiClient] 클라이언트 초기화 실패: {e}")
+                    cls._instance.client = None
             else:
+                logger.error("[GeminiClient] genai 모듈이 없어서 클라이언트 초기화 불가")
                 cls._instance.client = None
+                
         return cls._instance
     
     @retry(
