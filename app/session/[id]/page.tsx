@@ -34,7 +34,7 @@ export default function SessionPage() {
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     // Supabase Realtime 훅 사용
-    const { messages, isLoading } = useRealtimeMessages(sessionId)
+    const { messages, isLoading, isConnected } = useRealtimeMessages(sessionId)
 
     // 세션 정보 로드
     useEffect(() => {
