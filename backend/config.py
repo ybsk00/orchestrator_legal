@@ -22,3 +22,6 @@ SSE_BUFFER_SIZE = 100  # SSE 이벤트 버퍼 크기
 # 카테고리 정의
 CATEGORIES = ["newbiz", "marketing", "dev", "domain"]
 
+# 배포 URL (재귀 호출용)
+BASE_URL = os.environ.get("BASE_URL", "http://localhost:3000")
+
