@@ -1,0 +1,208 @@
+"""
+기본 에이전트 클래스 및 Gemini 클라이언트
+
+핵심 보완사항 반영:
+- 2-step 방식: 스트리밍(UI용) + JSON(저장용) 분리
+- 재시도 로직
+"""
+import json
+from abc import ABC, abstractmethod
+from typing import AsyncGenerator, Tuple, Callable, Optional, List
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+from config import GEMINI_API_KEY, GEMINI_MODEL
+
+# Google Generative AI 임포트 (설치 필요)
+try:
+    from google import genai
+    from google.genai import types
+except ImportError:
+    genai = None
+    types = None
+
+
+class GeminiClient:
+    """Google Gemini API 클라이언트 래퍼"""
+    
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            if genai and GEMINI_API_KEY:
+                cls._instance.client = genai.Client(api_key=GEMINI_API_KEY)
+            else:
+                cls._instance.client = None
+        return cls._instance
+    
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10)
+    )
+    async def generate_stream(
+        self,
+        system_prompt: str,
+        messages: List[dict],
+        user_message: str
+    ) -> AsyncGenerator[str, None]:
+        """
+        스트리밍 응답 생성 (UI 표시용)
+        """
+        if not self.client:
+            yield "[Gemini API 클라이언트가 초기화되지 않았습니다]"
+            return
+        
+        # 대화 히스토리 구성
+        history = []
+        for msg in messages:
+            role = "user" if msg["role"] == "user" else "model"
+            history.append({
+                "role": role,
+                "parts": [{"text": msg["content"]}]
+            })
+        
+        try:
+            chat = self.client.chats.create(
+                model=GEMINI_MODEL,
+                system_instruction=system_prompt,
+                history=history
+            )
+            
+            response = chat.send_message_stream(user_message)
+            
+            for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+        except Exception as e:
+            yield f"[오류 발생: {str(e)}]"
+    
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10)
+    )
+    async def generate_json(
+        self,
+        prompt: str,
+        json_schema: dict
+    ) -> dict:
+        """
+        구조화된 JSON 응답 생성 (저장용)
+        """
+        if not self.client:
+            return {"error": "Gemini API 클라이언트가 초기화되지 않았습니다"}
+        
+        try:
+            response = await self.client.models.generate_content_async(
+                model=GEMINI_MODEL,
+                contents=prompt,
+                config={
+                    "response_mime_type": "application/json",
+                    "response_schema": json_schema
+                }
+            )
+            return json.loads(response.text)
+        except Exception as e:
+            return {"error": str(e)}
+
+
+class BaseAgent(ABC):
+    """
+    에이전트 기본 클래스
+    
+    2-step 방식:
+    1. stream_response(): UI 표시용 스트리밍
+    2. get_structured_response(): 저장용 JSON
+    """
+    
+    def __init__(self, gemini_client: GeminiClient):
+        self.client = gemini_client
+        self._last_full_text = ""
+    
+    @property
+    @abstractmethod
+    def role_name(self) -> str:
+        """에이전트 역할명"""
+        pass
+    
+    @property
+    @abstractmethod
+    def system_prompt(self) -> str:
+        """시스템 프롬프트"""
+        pass
+    
+    @abstractmethod
+    def get_json_schema(self) -> dict:
+        """JSON 출력 스키마"""
+        pass
+    
+    async def stream_response(
+        self,
+        messages: List[dict],
+        user_message: str,
+        case_file_summary: str = "",
+        category: str = "",
+        rubric: str = ""
+    ) -> AsyncGenerator[str, None]:
+        """
+        Step 1: 스트리밍 응답 (UI 표시용)
+        
+        응답 전체를 _last_full_text에 저장
+        """
+        self._last_full_text = ""
+        
+        # 프롬프트 구성
+        full_prompt = self._build_prompt(
+            case_file_summary=case_file_summary,
+            category=category,
+            rubric=rubric
+        )
+        
+        async for chunk in self.client.generate_stream(
+            system_prompt=full_prompt,
+            messages=messages,
+            user_message=user_message
+        ):
+            self._last_full_text += chunk
+            yield chunk
+    
+    async def get_structured_response(self) -> dict:
+        """
+        Step 2: 구조화된 JSON 응답 (저장용)
+        
+        스트리밍 완료 후 호출하여 JSON 변환
+        """
+        if not self._last_full_text:
+            return {"error": "스트리밍 응답이 없습니다"}
+        
+        json_prompt = f"""
+아래 응답을 지정된 JSON 스키마에 맞게 구조화하세요:
+
+{self._last_full_text}
+"""
+        
+        return await self.client.generate_json(
+            prompt=json_prompt,
+            json_schema=self.get_json_schema()
+        )
+    
+    def _build_prompt(
+        self,
+        case_file_summary: str = "",
+        category: str = "",
+        rubric: str = ""
+    ) -> str:
+        """시스템 프롬프트 구성"""
+        prompt = self.system_prompt
+        
+        if category:
+            prompt = prompt.replace("{{category}}", category)
+        if rubric:
+            prompt = prompt.replace("{{rubric}}", rubric)
+        if case_file_summary:
+            prompt = prompt.replace("{{case_file_summary}}", case_file_summary)
+        
+        return prompt
+
+
+# 싱글톤 Gemini 클라이언트
+gemini_client = GeminiClient()

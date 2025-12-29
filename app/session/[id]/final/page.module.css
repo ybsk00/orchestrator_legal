@@ -1,0 +1,332 @@
+.main {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+    padding: 2rem;
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.avatarPlaceholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 150px;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.category {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    background: rgba(99, 102, 241, 0.2);
+    color: #6366f1;
+    border-radius: 20px;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+
+.title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 0.5rem;
+}
+
+.sessionId {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+/* Loading */
+.loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 60vh;
+    gap: 1rem;
+    color: #888;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(99, 102, 241, 0.2);
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Error */
+.error {
+    text-align: center;
+    padding: 3rem;
+}
+
+.error h2 {
+    font-size: 1.5rem;
+    color: #dc2626;
+    margin-bottom: 1rem;
+}
+
+.error p {
+    color: #888;
+    margin-bottom: 2rem;
+}
+
+.backButton {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: #6366f1;
+    color: #fff;
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+/* Sections */
+.section {
+    margin-bottom: 2.5rem;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+}
+
+.sectionTitle {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Summary Box */
+.summaryBox {
+    font-size: 1rem;
+    line-height: 1.8;
+    color: #ddd;
+    padding: 1rem;
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: 8px;
+    white-space: pre-wrap;
+}
+
+/* Decisions List */
+.decisionsList {
+    list-style: decimal;
+    padding-left: 1.5rem;
+}
+
+.decisionsList li {
+    font-size: 0.95rem;
+    color: #ddd;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.decisionsList li:last-child {
+    border-bottom: none;
+}
+
+/* Roadmap */
+.roadmapGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.roadmapCard {
+    padding: 1rem;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 8px;
+}
+
+.roadmapCard h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #10b981;
+    margin-bottom: 0.5rem;
+}
+
+.roadmapCard ul {
+    list-style: disc;
+    padding-left: 1.25rem;
+}
+
+.roadmapCard li {
+    font-size: 0.85rem;
+    color: #aaa;
+    padding: 0.25rem 0;
+}
+
+/* Risk Table */
+.riskTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.riskTable th,
+.riskTable td {
+    text-align: left;
+    padding: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.riskTable th {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.riskTable td {
+    font-size: 0.9rem;
+    color: #ddd;
+}
+
+.riskTable td:first-child {
+    color: #f59e0b;
+}
+
+/* KPI List */
+.kpiList {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 0.75rem;
+}
+
+.kpiList li {
+    padding: 0.75rem 1rem;
+    background: rgba(139, 92, 246, 0.1);
+    border-left: 3px solid #8b5cf6;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    color: #ddd;
+}
+
+/* Issues List */
+.issuesList {
+    list-style: none;
+}
+
+.issuesList li {
+    padding: 0.75rem 1rem;
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 3px solid #ef4444;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    color: #ddd;
+    margin-bottom: 0.5rem;
+}
+
+/* Round Summaries */
+.roundSummaries {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.roundCard {
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+}
+
+.roundCard h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #6366f1;
+    margin-bottom: 0.5rem;
+}
+
+.roundCard p {
+    font-size: 0.85rem;
+    color: #aaa;
+}
+
+/* Actions */
+.actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 3rem;
+}
+
+.downloadBtn,
+.newSessionBtn {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.downloadBtn {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.downloadBtn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.newSessionBtn {
+    background: #6366f1;
+    color: #fff;
+}
+
+.newSessionBtn:hover {
+    background: #4f46e5;
+}
+
+/* Print styles */
+@media print {
+    .main {
+        background: #fff;
+        padding: 0;
+    }
+
+    .section {
+        background: none;
+        border: 1px solid #ddd;
+    }
+
+    .actions {
+        display: none;
+    }
+
+    .title,
+    .sectionTitle {
+        color: #000;
+    }
+
+    .summaryBox,
+    .roadmapCard,
+    .riskTable td,
+    .kpiList li,
+    .issuesList li,
+    .roundCard p,
+    .decisionsList li {
+        color: #333;
+    }
+}

@@ -1,0 +1,163 @@
+.resultAvatarContainer {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 20px;
+    margin-bottom: 2rem;
+}
+
+/* Avatar Card */
+.avatarCard {
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 0.75rem;
+    transition: all 0.3s ease;
+    --accent-color: #6366f1;
+    --glow-color: rgba(99, 102, 241, 0.4);
+}
+
+.avatarCard.speaking {
+    transform: scale(1.02);
+    border-color: var(--accent-color);
+    box-shadow:
+        0 0 20px var(--glow-color),
+        0 0 40px var(--glow-color),
+        inset 0 0 20px var(--glow-color);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+/* Video Container */
+.videoContainer {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+}
+
+.video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Loading/Fallback */
+.loadingPlaceholder,
+.fallback {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.8);
+}
+
+.fallbackImage {
+    width: 80%;
+    height: 80%;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+/* Status Label */
+.statusLabel {
+    margin-top: 0.5rem;
+    text-align: center;
+}
+
+.assistantName {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #6366f1;
+}
+
+/* Speech Bubble */
+.speechBubble {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 1.25rem;
+    position: relative;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+}
+
+.speechBubble::before {
+    content: '';
+    position: absolute;
+    left: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 10px solid transparent;
+    border-right-color: rgba(255, 255, 255, 0.1);
+}
+
+.speechBubble::after {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 10px solid transparent;
+    border-right-color: rgba(255, 255, 255, 0.05);
+}
+
+.messageText {
+    font-size: 1rem;
+    line-height: 1.7;
+    color: #ddd;
+    margin: 0;
+}
+
+.cursor {
+    animation: blink 0.7s infinite;
+    color: #6366f1;
+}
+
+@keyframes blink {
+
+    0%,
+    50% {
+        opacity: 1;
+    }
+
+    51%,
+    100% {
+        opacity: 0;
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .resultAvatarContainer {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .videoContainer {
+        width: 120px;
+        height: 120px;
+    }
+
+    .speechBubble {
+        width: 100%;
+    }
+
+    .speechBubble::before,
+    .speechBubble::after {
+        display: none;
+    }
+}

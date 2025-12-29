@@ -1,0 +1,11 @@
+# Root-level requirements for Vercel Python Runtime
+# Vercel이 이 파일을 인식하여 Python 의존성 설치
+
+fastapi>=0.100.0
+uvicorn>=0.23.0
+google-generativeai==0.8.3
+pydantic>=2.0.0
+sse-starlette>=1.6.0
+tenacity>=8.2.0
+python-dotenv>=1.0.0
+supabase>=2.0.0

@@ -1,0 +1,22 @@
+{
+  "functions": {
+    "api/**/*.py": {
+      "runtime": "python3.12",
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index.py"
+    }
+  ],
+  "build": {
+    "excludeFiles": [
+      "**/__pycache__/**",
+      "**/.pytest_cache/**",
+      "**/tests/**",
+      "**/*.pyc"
+    ]
+  }
+}

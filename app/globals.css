@@ -1,0 +1,47 @@
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --agent1: #10b981;
+  --agent2: #f59e0b;
+  --agent3: #8b5cf6;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+
+/* 에이전트 색상 */
+.agent1 { color: var(--agent1); }
+.agent2 { color: var(--agent2); }
+.agent3 { color: var(--agent3); }
+
+.agent1-bg { background-color: var(--agent1); }
+.agent2-bg { background-color: var(--agent2); }
+.agent3-bg { background-color: var(--agent3); }
