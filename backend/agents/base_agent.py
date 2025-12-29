@@ -79,33 +79,56 @@ class GeminiClient:
     ) -> AsyncGenerator[str, None]:
         """
         스트리밍 응답 생성 (UI 표시용)
+        google-genai SDK의 models.generate_content_stream() 사용
         """
         if not self.client:
             yield "[Gemini API 클라이언트가 초기화되지 않았습니다]"
             return
         
-        # 대화 히스토리 구성
-        history = []
+        # 대화 히스토리 + 현재 메시지를 포함한 전체 컨텐츠 구성
+        contents = []
+        
+        # 시스템 프롬프트를 첫 번째 user 메시지로 추가
+        if system_prompt:
+            contents.append({
+                "role": "user",
+                "parts": [{"text": f"[시스템 지시사항]\n{system_prompt}"}]
+            })
+            contents.append({
+                "role": "model",
+                "parts": [{"text": "네, 지시사항을 이해했습니다. 해당 역할을 수행하겠습니다."}]
+            })
+        
+        # 대화 히스토리 추가
         for msg in messages:
             role = "user" if msg["role"] == "user" else "model"
-            history.append({
+            contents.append({
                 "role": role,
                 "parts": [{"text": msg["content"]}]
             })
         
+        # 현재 사용자 메시지 추가
+        contents.append({
+            "role": "user",
+            "parts": [{"text": user_message}]
+        })
+        
         try:
-            chat = self.client.chats.create(
-                model=GEMINI_MODEL,
-                system_instruction=system_prompt,
-                history=history
-            )
+            logger.info(f"[GeminiClient] Streaming 요청 시작 - model={GEMINI_MODEL}")
             
-            response = chat.send_message_stream(user_message)
+            # models.generate_content_stream 사용
+            response = self.client.models.generate_content_stream(
+                model=GEMINI_MODEL,
+                contents=contents
+            )
             
             for chunk in response:
                 if chunk.text:
                     yield chunk.text
+                    
+            logger.info(f"[GeminiClient] Streaming 완료")
         except Exception as e:
+            logger.error(f"[GeminiClient] Streaming 오류: {e}")
             yield f"[오류 발생: {str(e)}]"
     
     @retry(
