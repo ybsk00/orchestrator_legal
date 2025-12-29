@@ -3,6 +3,7 @@ API 라우트 정의
 """
 import asyncio
 import logging
+import uuid
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -16,6 +17,7 @@ from orchestrator.stop_detector import stop_detector, StopConfidence
 from agents.base_agent import gemini_client
 from agents.agent1_planner import Agent1Planner
 from agents.agent2_critic import Agent2Critic
+from storage import supabase_client as db
 from .events import sse_event_manager, EventType
 
 # 로깅 설정
@@ -63,9 +65,8 @@ class SessionResponse(BaseModel):
     phase: str
 
 
-# 세션 저장소 (인메모리)
-sessions_store: dict[str, Session] = {}
-case_files_store: dict[str, CaseFile] = {}
+# Supabase 기반 세션 저장소 (인메모리 제거)
+# sessions_store와 case_files_store는 더 이상 사용하지 않음
 
 
 async def run_agent1_turn(session_id: str, topic: str, category: str):
@@ -76,26 +77,37 @@ async def run_agent1_turn(session_id: str, topic: str, category: str):
     """
     logger.info(f"[Agent1Turn] 시작 - session_id={session_id}, topic={topic}, category={category}")
     
-    session = state_machine.get_session(session_id)
-    if not session:
-        logger.error(f"[Agent1Turn] 세션을 찾을 수 없음 - session_id={session_id}")
-        return
-    
-    logger.info(f"[Agent1Turn] 세션 조회 성공 - status={session.status}, round={session.round_index}")
-    
-    case_file = case_files_store.get(session_id)
-    logger.info(f"[Agent1Turn] CaseFile 조회 - found={case_file is not None}")
-    
     try:
-        # 새 라운드 시작
-        logger.info(f"[Agent1Turn] 새 라운드 시작 시도")
-        state_machine.start_new_round(session_id)
-        logger.info(f"[Agent1Turn] 라운드 시작됨 - round_index={session.round_index}")
+        # Supabase에서 세션 조회
+        session_data = await db.get_session(session_id)
+        if not session_data:
+            logger.error(f"[Agent1Turn] 세션을 찾을 수 없음 - session_id={session_id}")
+            return
+        
+        logger.info(f"[Agent1Turn] 세션 조회 성공 - status={session_data.get('status')}, round={session_data.get('round_index')}")
+        
+        # CaseFile 조회
+        case_file_data = await db.get_case_file(session_id)
+        case_file_summary = ""
+        if case_file_data:
+            # CaseFile 요약 생성
+            decisions = case_file_data.get('decisions', [])
+            open_issues = case_file_data.get('open_issues', [])
+            case_file_summary = f"결정사항: {'; '.join(decisions[-3:])}. 미해결: {'; '.join(open_issues[-3:])}"
+        logger.info(f"[Agent1Turn] CaseFile 조회 - found={case_file_data is not None}")
+        
+        # 라운드 인덱스 업데이트
+        new_round_index = (session_data.get('round_index', 0) or 0) + 1
+        await db.update_session(session_id, {
+            "round_index": new_round_index,
+            "phase": "agent1_turn"
+        })
+        logger.info(f"[Agent1Turn] 라운드 시작됨 - round_index={new_round_index}")
         
         await sse_event_manager.emit(
             session_id,
             EventType.ROUND_START,
-            {"round_index": session.round_index}
+            {"round_index": new_round_index}
         )
         logger.info(f"[Agent1Turn] ROUND_START 이벤트 발송 완료")
         
@@ -110,46 +122,45 @@ async def run_agent1_turn(session_id: str, topic: str, category: str):
         await sse_event_manager.emit(
             session_id,
             EventType.MESSAGE_STREAM_START,
-            {"role": "agent1", "round_index": session.round_index, "phase": "agent1_turn"}
+            {"role": "agent1", "round_index": new_round_index, "phase": "agent1_turn"}
         )
         logger.info(f"[Agent1Turn] MESSAGE_STREAM_START 이벤트 발송 완료")
         
         # Agent 1 실행 (스트리밍)
-        async def agent1_turn():
-            logger.info(f"[Agent1Turn] Gemini API 호출 시작")
-            full_response = ""
-            chunk_count = 0
-            async for chunk in agent1.stream_response(
-                messages=[],
-                user_message=f"주제: {topic}",
-                case_file_summary=case_file.get_summary() if case_file else "",
-                category=category
-            ):
-                full_response += chunk
-                chunk_count += 1
-                await sse_event_manager.emit(
-                    session_id,
-                    EventType.MESSAGE_STREAM_CHUNK,
-                    {"text": chunk}
-                )
-            logger.info(f"[Agent1Turn] 스트리밍 완료 - chunks={chunk_count}, response_len={len(full_response)}")
-            return full_response
-        
-        logger.info(f"[Agent1Turn] turn_manager.execute_turn 호출")
-        response = await turn_manager.execute_turn(session_id, agent1_turn)
-        logger.info(f"[Agent1Turn] execute_turn 완료 - response={response[:100] if response else 'None'}...")
+        logger.info(f"[Agent1Turn] Gemini API 호출 시작")
+        full_response = ""
+        chunk_count = 0
+        async for chunk in agent1.stream_response(
+            messages=[],
+            user_message=f"주제: {topic}",
+            case_file_summary=case_file_summary,
+            category=category
+        ):
+            full_response += chunk
+            chunk_count += 1
+            await sse_event_manager.emit(
+                session_id,
+                EventType.MESSAGE_STREAM_CHUNK,
+                {"text": chunk}
+            )
+        logger.info(f"[Agent1Turn] 스트리밍 완료 - chunks={chunk_count}, response_len={len(full_response)}")
         
         # 스트리밍 종료 알림
         await sse_event_manager.emit(
             session_id,
             EventType.MESSAGE_STREAM_END,
-            {"message_id": f"agent1-{session_id}-{session.round_index}"}
+            {"message_id": f"agent1-{session_id}-{new_round_index}"}
         )
         logger.info(f"[Agent1Turn] MESSAGE_STREAM_END 이벤트 발송 완료")
         
-        # TODO: 향후 CaseFile에 대화 기록 저장 로직 추가
-        # if case_file and response:
-        #     case_file.add_turn("agent1", response)
+        # 메시지 저장
+        await db.save_message(session_id, {
+            "role": "agent1",
+            "content_text": full_response,
+            "round_index": new_round_index,
+            "phase": "agent1_turn"
+        })
+        logger.info(f"[Agent1Turn] 메시지 저장 완료")
         
     except Exception as e:
         logger.error(f"[Agent1Turn] 오류 발생 - {type(e).__name__}: {str(e)}", exc_info=True)
@@ -161,7 +172,7 @@ async def run_agent1_turn(session_id: str, topic: str, category: str):
 
 
 @router.post("/sessions", response_model=CreateSessionResponse)
-async def create_session(request: CreateSessionRequest, background_tasks: BackgroundTasks):
+async def create_session_endpoint(request: CreateSessionRequest, background_tasks: BackgroundTasks):
     """
     새 토론 세션 생성
     
@@ -170,62 +181,82 @@ async def create_session(request: CreateSessionRequest, background_tasks: Backgr
     logger.info(f"[CreateSession] 요청 수신 - category={request.category}, topic={request.topic}")
     
     # 카테고리 검증
-    try:
-        category = Category(request.category)
-    except ValueError:
+    if request.category not in ["newbiz", "marketing", "dev", "domain"]:
         logger.error(f"[CreateSession] 잘못된 카테고리 - {request.category}")
         raise HTTPException(
             status_code=400,
             detail=f"Invalid category: {request.category}. Valid: newbiz, marketing, dev, domain"
         )
     
-    # 세션 생성
-    session = Session(
-        category=category,
-        topic=request.topic
-    )
-    logger.info(f"[CreateSession] 세션 생성됨 - session_id={session.id}")
-    
-    # 상태 머신에 등록
-    state_machine.create_session(session)
-    sessions_store[session.id] = session
-    logger.info(f"[CreateSession] 상태 머신에 등록됨 - sessions_store_size={len(sessions_store)}")
-    
-    # CaseFile 초기화
-    case_file = CaseFile(session_id=session.id)
-    case_files_store[session.id] = case_file
-    logger.info(f"[CreateSession] CaseFile 초기화됨")
-    
-    # Agent 1 자동 시작 (백그라운드)
-    logger.info(f"[CreateSession] 백그라운드 태스크 등록 시작 - run_agent1_turn")
-    background_tasks.add_task(run_agent1_turn, session.id, request.topic, request.category)
-    logger.info(f"[CreateSession] 백그라운드 태스크 등록 완료")
-    
-    return CreateSessionResponse(
-        session_id=session.id,
-        category=session.category,
-        topic=session.topic,
-        status=session.status
-    )
+    try:
+        # Supabase에 세션 생성 (user_id는 NULL - 익명 세션)
+        session_data = await db.create_session(
+            user_id=None,
+            category=request.category,
+            topic=request.topic
+        )
+        
+        if not session_data:
+            raise HTTPException(status_code=500, detail="Failed to create session")
+        
+        session_id = session_data["id"]
+        logger.info(f"[CreateSession] 세션 생성됨 - session_id={session_id}")
+        
+        # CaseFile 초기화
+        await db.save_case_file(session_id, {
+            "facts": [],
+            "goals": [],
+            "constraints": [],
+            "decisions": [],
+            "open_issues": [],
+            "assumptions": [],
+            "next_experiments": []
+        })
+        logger.info(f"[CreateSession] CaseFile 초기화됨")
+        
+        # Agent 1 자동 시작 (백그라운드)
+        logger.info(f"[CreateSession] 백그라운드 태스크 등록 시작 - run_agent1_turn")
+        background_tasks.add_task(run_agent1_turn, session_id, request.topic, request.category)
+        logger.info(f"[CreateSession] 백그라운드 태스크 등록 완료")
+        
+        return CreateSessionResponse(
+            session_id=session_id,
+            category=session_data["category"],
+            topic=session_data["topic"],
+            status=session_data["status"]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[CreateSession] 오류 발생 - {type(e).__name__}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/sessions/{session_id}", response_model=SessionResponse)
-async def get_session(session_id: str):
+async def get_session_endpoint(session_id: str):
     """
     세션 상태 조회
     """
-    session = state_machine.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    return SessionResponse(
-        id=session.id,
-        status=session.status,
-        category=session.category,
-        topic=session.topic,
-        round_index=session.round_index,
-        phase=session.phase
-    )
+    try:
+        session_data = await db.get_session(session_id)
+        if not session_data:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        return SessionResponse(
+            id=session_data["id"],
+            status=session_data["status"],
+            category=session_data["category"],
+            topic=session_data["topic"],
+            round_index=session_data.get("round_index", 0) or 0,
+            phase=session_data.get("phase", "idle") or "idle"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[GetSession] 오류 발생 - {type(e).__name__}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.post("/sessions/{session_id}/messages", response_model=UserMessageResponse)
