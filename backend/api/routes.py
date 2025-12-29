@@ -404,19 +404,28 @@ async def stream_events(
     
     - Last-Event-ID 지원으로 재연결 시 이벤트 복구
     """
-    session = state_machine.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    return StreamingResponse(
-        sse_event_manager.stream_events(session_id, last_event_id),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
-        }
-    )
+    try:
+        session_data = await db.get_session(session_id)
+        if not session_data:
+            logger.error(f"[StreamEvents] 세션을 찾을 수 없음 - session_id={session_id}")
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        logger.info(f"[StreamEvents] SSE 연결 시작 - session_id={session_id}")
+        
+        return StreamingResponse(
+            sse_event_manager.stream_events(session_id, last_event_id),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[StreamEvents] 오류 발생 - {type(e).__name__}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/sessions/{session_id}/report")
@@ -424,16 +433,25 @@ async def get_final_report(session_id: str):
     """
     최종 리포트 조회
     """
-    session = state_machine.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    if session.status != SessionStatus.FINALIZED:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Report not ready. Session status: {session.status}"
-        )
-    
-    # TODO: FinalReport 저장소에서 조회
-    
-    return {"message": "Report endpoint - to be implemented"}
+    try:
+        session_data = await db.get_session(session_id)
+        if not session_data:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        if session_data.get("status") != "finalized":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Report not ready. Session status: {session_data.get('status')}"
+            )
+        
+        # Supabase에서 리포트 조회
+        report_data = await db.get_final_report(session_id)
+        if not report_data:
+            return {"message": "Report not generated yet"}
+        
+        return report_data
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[GetReport] 오류 발생 - {type(e).__name__}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
