@@ -155,6 +155,7 @@ async def execute_turn(session_id: str, turn_index: int):
             "message_id": f"{turn_spec.role}-{session_id}-{turn_index}"
         })
         
+        # 메시지 저장
         await db.save_message(session_id, {
             "role": turn_spec.role,
             "content_text": full_response,
@@ -162,6 +163,15 @@ async def execute_turn(session_id: str, turn_index: int):
             "phase": turn_spec.turn_type,
             "event_id": turn_index
         })
+
+        # 최종 리포트인 경우 별도 테이블에도 저장
+        if turn_spec.turn_type == TurnType.FINAL_REPORT:
+            logger.info(f"[ExecuteTurn] 최종 리포트 저장 중...")
+            await db.save_final_report(session_id, {
+                "report_json": {"content": full_response},
+                "report_md": full_response
+            })
+            # 세션 상태 업데이트 (finalized)는 아래에서 처리됨
 
         # 다음 턴 트리거 (재귀 호출)
         next_turn_index = turn_index + 1

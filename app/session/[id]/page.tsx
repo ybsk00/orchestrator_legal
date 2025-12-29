@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, Suspense } from 'react'
 import { useParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useRealtimeMessages, Message } from '@/lib/useRealtimeMessages'
+import TypingMessage from '@/components/TypingMessage'
 import styles from './page.module.css'
 
 // Avatar Panel은 클라이언트 사이드에서만 로드
@@ -116,6 +117,25 @@ export default function SessionPage() {
         }
     }
 
+    const [showReportModal, setShowReportModal] = useState(false)
+    const [reportContent, setReportContent] = useState('')
+
+    // 리포트 조회
+    const handleViewReport = async () => {
+        try {
+            const res = await fetch(`/api/sessions/${sessionId}/report`)
+            if (res.ok) {
+                const data = await res.json()
+                setReportContent(data.report_md || '리포트 내용이 없습니다.')
+                setShowReportModal(true)
+            } else {
+                alert('리포트를 불러오는데 실패했습니다.')
+            }
+        } catch (error) {
+            console.error('Failed to fetch report:', error)
+        }
+    }
+
     const getAgentLabel = (role: string) => {
         switch (role) {
             case 'agent1': return '🔵 Agent 1: 구현계획'
@@ -141,9 +161,16 @@ export default function SessionPage() {
                     <span className={`${styles.connectionStatus} ${isConnected ? styles.connected : ''}`}>
                         {isConnected ? '● 연결됨' : '○ 연결 중...'}
                     </span>
-                    <button className={styles.finalizeBtn} onClick={handleFinalize}>
-                        마무리하기
-                    </button>
+
+                    {session?.status === 'finalized' ? (
+                        <button className={styles.reportBtn} onClick={handleViewReport}>
+                            📑 최종 리포트 보기
+                        </button>
+                    ) : (
+                        <button className={styles.finalizeBtn} onClick={handleFinalize}>
+                            마무리하기
+                        </button>
+                    )}
                 </div>
             </header>
 
@@ -169,7 +196,11 @@ export default function SessionPage() {
                                     {msg.isStreaming && <span className={styles.streamingDot}>●</span>}
                                 </div>
                                 <div className={styles.messageContent}>
-                                    {msg.content}
+                                    {['agent1', 'agent2', 'agent3'].includes(msg.role) ? (
+                                        <TypingMessage text={msg.content} speed={20} />
+                                    ) : (
+                                        msg.content
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -185,8 +216,13 @@ export default function SessionPage() {
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                            disabled={session?.status === 'finalized'}
                         />
-                        <button className={styles.sendBtn} onClick={handleSend}>
+                        <button
+                            className={styles.sendBtn}
+                            onClick={handleSend}
+                            disabled={session?.status === 'finalized'}
+                        >
                             전송
                         </button>
                     </div>
@@ -204,6 +240,24 @@ export default function SessionPage() {
                             <button onClick={() => handleConfirmStop(false)}>계속 토론</button>
                             <button className={styles.primary} onClick={() => handleConfirmStop(true)}>
                                 마무리하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 리포트 모달 */}
+            {showReportModal && (
+                <div className={styles.modalOverlay} onClick={() => setShowReportModal(false)}>
+                    <div className={`${styles.modal} ${styles.reportModal}`} onClick={e => e.stopPropagation()}>
+                        <h3>📑 최종 합의 리포트</h3>
+                        <div className={styles.reportContent}>
+                            {reportContent}
+                        </div>
+                        <div className={styles.modalActions}>
+                            <button onClick={() => setShowReportModal(false)}>닫기</button>
+                            <button className={styles.primary} onClick={() => navigator.clipboard.writeText(reportContent)}>
+                                복사하기
                             </button>
                         </div>
                     </div>
