@@ -1,7 +1,10 @@
 'use client'
 
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, Suspense } from 'react'
+import dynamic from 'next/dynamic'
 import styles from './AvatarPanel.module.css'
+
+const WaveBackground = dynamic(() => import('@/components/ui/WaveBackground'), { ssr: false })
 
 interface AvatarPanelProps {
     activeSpeaker: string | null
@@ -125,6 +128,10 @@ export default function AvatarPanel({ activeSpeaker }: AvatarPanelProps) {
 
     return (
         <div className={styles.avatarPanel}>
+            <Suspense fallback={null}>
+                <WaveBackground />
+            </Suspense>
+
             {/* 상단: Agent 1, Agent 2 */}
             <div className={styles.topRow}>
                 {topAgents.map((agent) => (
