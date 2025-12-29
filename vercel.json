@@ -1,4 +1,7 @@
 {
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
   "functions": {
     "api/**/*.py": {
       "runtime": "python3.12",
@@ -10,13 +13,5 @@
       "source": "/api/:path*",
       "destination": "/api/index.py"
     }
-  ],
-  "build": {
-    "excludeFiles": [
-      "**/__pycache__/**",
-      "**/.pytest_cache/**",
-      "**/tests/**",
-      "**/*.pyc"
-    ]
-  }
+  ]
 }
