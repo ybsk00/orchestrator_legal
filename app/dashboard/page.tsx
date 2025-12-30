@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import styles from './page.module.css'
 
@@ -29,7 +29,7 @@ export default function DashboardPage() {
     const [isLoading, setIsLoading] = useState(false)
     const [user, setUser] = useState<any>(null)
     const router = useRouter()
-    const supabase = createClientComponentClient()
+    const supabase = createClient()
 
     useEffect(() => {
         const getUser = async () => {

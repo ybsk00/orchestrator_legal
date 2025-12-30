@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import styles from './page.module.css'
 
@@ -11,7 +11,7 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const router = useRouter()
-    const supabase = createClientComponentClient()
+    const supabase = createClient()
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
