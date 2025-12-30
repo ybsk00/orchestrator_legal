@@ -143,7 +143,7 @@ export default function SessionPage() {
                 </div>
                 <div className={styles.headerActions}>
                     <span className={styles.roundBadge}>
-                        라운드 {session?.round_index || 0}/5
+                        라운드 {session?.round_index || 0}/3
                     </span>
                     <span className={`${styles.connectionStatus} ${isConnected ? styles.connected : ''}`}>
                         {isConnected ? '● 연결됨' : '○ 연결 중...'}
