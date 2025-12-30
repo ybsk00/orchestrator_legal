@@ -318,13 +318,10 @@ async def create_session_endpoint(request: CreateSessionRequest, background_task
             "status": "active"
         })
         
-        # CaseFile 초기화
+        # CaseFile 초기화 (기존 스키마 필드만 사용)
         await db.save_case_file(session_id, {
             "facts": [], "goals": [], "constraints": [], "decisions": [], 
-            "open_issues": [], "assumptions": [], "next_experiments": [],
-            "criticisms_so_far": [],
-            "criticisms_last_round": [],
-            "schema_version": "2.2"
+            "open_issues": [], "assumptions": [], "next_experiments": []
         })
         
         # 첫 번째 라운드 자동 시작 (사용자 입력 없이 바로 시작)
@@ -440,10 +437,10 @@ async def get_session_endpoint(session_id: str):
 
 
 @router.get("/sessions", response_model=List[SessionResponse])
-async def list_sessions_endpoint():
-    """세션 목록 조회"""
+async def list_sessions_endpoint(user_id: Optional[str] = Query(None)):
+    """세션 목록 조회 (user_id로 필터링 가능)"""
     try:
-        sessions = await db.list_sessions()
+        sessions = await db.list_sessions(user_id)
         return [
             SessionResponse(
                 id=s["id"],
