@@ -439,8 +439,13 @@ async def get_session_endpoint(session_id: str):
 
 @router.get("/sessions", response_model=List[SessionResponse])
 async def list_sessions_endpoint(user_id: Optional[str] = Query(None)):
-    """세션 목록 조회 (user_id로 필터링 가능)"""
+    """세션 목록 조회 (user_id 필수 - 없으면 빈 배열 반환)"""
     try:
+        # user_id가 없으면 빈 배열 반환 (보안상 모든 세션을 보여주지 않음)
+        if not user_id:
+            logger.warning("[ListSessions] user_id not provided, returning empty list")
+            return []
+        
         sessions = await db.list_sessions(user_id)
         return [
             SessionResponse(
