@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { useSessionEvents } from '@/lib/useSessionEvents'
 import GateSummaryCard from '@/components/gate/GateSummaryCard'
 import SteeringPanel from '@/components/gate/SteeringPanel'
