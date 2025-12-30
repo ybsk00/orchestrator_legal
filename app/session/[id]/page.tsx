@@ -5,8 +5,8 @@ import EndGateCard from '@/components/gate/EndGateCard'
 
 // ... (existing imports)
 
-export default function SessionPage() {
-    // ... (existing state)
+export default function SessionPage({ params }: { params: { id: string } }) {
+    const sessionId = params.id
 
     // SSE 이벤트 훅 사용
     const { gateData } = useSessionEvents(sessionId)
