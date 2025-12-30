@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import styles from './page.module.css'
 
 // Animated particles background
@@ -98,6 +100,27 @@ const FEATURES = [
 
 export default function HomePage() {
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+    const [isLoggedIn, setIsLoggedIn] = useState(false)
+    const router = useRouter()
+    const supabase = createClient()
+
+    // 로그인 상태 확인
+    useEffect(() => {
+        const checkAuth = async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            setIsLoggedIn(!!user)
+        }
+        checkAuth()
+    }, [supabase])
+
+    const handleStart = () => {
+        // 로그인된 상태면 바로 대시보드로, 아니면 로그인 페이지로
+        if (isLoggedIn) {
+            router.push('/dashboard')
+        } else {
+            router.push('/login')
+        }
+    }
 
     const handleMouseMove = (e: React.MouseEvent) => {
         const rect = e.currentTarget.getBoundingClientRect()
@@ -136,12 +159,14 @@ export default function HomePage() {
                             4명의 AI 전문가가 다양한 관점에서 토론하고 최적의 결론을 도출합니다.
                         </p>
                         <div className={styles.heroButtons}>
-                            <Link href="/login" className={styles.primaryButton}>
-                                시작하기 →
-                            </Link>
-                            <Link href="/dashboard" className={styles.secondaryButton}>
-                                대시보드
-                            </Link>
+                            <button onClick={handleStart} className={styles.primaryButton}>
+                                {isLoggedIn ? '대시보드로 이동 →' : '시작하기 →'}
+                            </button>
+                            {!isLoggedIn && (
+                                <Link href="/dashboard" className={styles.secondaryButton}>
+                                    대시보드
+                                </Link>
+                            )}
                         </div>
                     </div>
                 </section>
@@ -192,9 +217,9 @@ export default function HomePage() {
                         <div className={styles.cardGlow} />
                         <h2>지금 바로 시작하세요</h2>
                         <p>로그인하여 AI 협업 시스템의 모든 기능을 경험해보세요.</p>
-                        <Link href="/login" className={styles.ctaButton}>
-                            무료로 시작하기
-                        </Link>
+                        <button onClick={handleStart} className={styles.ctaButton}>
+                            {isLoggedIn ? '대시보드로 이동' : '무료로 시작하기'}
+                        </button>
                     </div>
                 </section>
 

@@ -157,7 +157,7 @@ export default function DashboardPage() {
             {/* Sidebar */}
             <aside className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''}`}>
                 <div className={styles.sidebarHeader}>
-                    <Link href="/" className={styles.logoLink}>
+                    <Link href="/dashboard" className={styles.logoLink}>
                         <span className={styles.logoIcon}>🤖</span>
                         <span className={styles.logoText}>AI 협업시스템</span>
                     </Link>

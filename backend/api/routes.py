@@ -315,7 +315,7 @@ async def create_session_endpoint(request: CreateSessionRequest, background_task
         await db.update_session(session_id, {
             "round_index": 0,
             "phase": Phase.WAIT_USER.value,
-            "status": "waiting"
+            "status": "active"
         })
         
         # CaseFile 초기화
