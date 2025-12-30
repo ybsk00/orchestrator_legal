@@ -196,7 +196,8 @@ class BaseAgent(ABC):
         user_message: str,
         case_file_summary: str = "",
         category: str = "",
-        rubric: str = ""
+        rubric: str = "",
+        steering_block: str = ""
     ) -> AsyncGenerator[str, None]:
         """
         Step 1: 스트리밍 응답 (UI 표시용)
@@ -209,7 +210,8 @@ class BaseAgent(ABC):
         full_prompt = self._build_prompt(
             case_file_summary=case_file_summary,
             category=category,
-            rubric=rubric
+            rubric=rubric,
+            steering_block=steering_block
         )
         
         async for chunk in self.client.generate_stream(
@@ -244,10 +246,15 @@ class BaseAgent(ABC):
         self,
         case_file_summary: str = "",
         category: str = "",
-        rubric: str = ""
+        rubric: str = "",
+        steering_block: str = ""
     ) -> str:
         """시스템 프롬프트 구성"""
         prompt = self.system_prompt
+        
+        # Steering Block 최상단 주입
+        if steering_block:
+            prompt = f"{steering_block}\n\n{prompt}"
         
         if category:
             prompt = prompt.replace("{{category}}", category)

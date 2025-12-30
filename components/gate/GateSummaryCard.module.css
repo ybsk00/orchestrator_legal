@@ -1,0 +1,60 @@
+.card {
+    background: rgba(30, 30, 40, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 1rem;
+}
+
+.header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #fff;
+}
+
+.statusBadge {
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: #000;
+}
+
+.content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.section h4 {
+    margin: 0 0 0.8rem 0;
+    font-size: 1rem;
+    color: #aaa;
+}
+
+.section p {
+    margin: 0;
+    line-height: 1.6;
+    color: #eee;
+}
+
+.section ul {
+    margin: 0;
+    padding-left: 1.2rem;
+    color: #eee;
+}
+
+.section li {
+    margin-bottom: 0.5rem;
+}

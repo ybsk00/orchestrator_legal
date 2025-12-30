@@ -1,0 +1,164 @@
+.panel {
+    background: rgba(20, 20, 30, 0.95);
+    border: 1px solid rgba(100, 100, 255, 0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+}
+
+.actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.skipBtn,
+.editBtn,
+.finalizeBtn {
+    padding: 0.8rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.skipBtn {
+    background: #00C851;
+    color: #fff;
+}
+
+.skipBtn:hover {
+    background: #007E33;
+}
+
+.editBtn {
+    background: #33b5e5;
+    color: #fff;
+}
+
+.editBtn:hover {
+    background: #0099CC;
+}
+
+.finalizeBtn {
+    background: #ff4444;
+    color: #fff;
+}
+
+.finalizeBtn:hover {
+    background: #CC0000;
+}
+
+.description {
+    color: #aaa;
+    margin-bottom: 1.5rem;
+}
+
+.formGroup {
+    margin-bottom: 1.5rem;
+}
+
+.formGroup label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #ddd;
+    font-weight: bold;
+}
+
+.formGroup input,
+.formGroup textarea {
+    width: 100%;
+    padding: 0.8rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 1rem;
+}
+
+.formGroup textarea {
+    resize: vertical;
+}
+
+.tagInput {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.tagInput button {
+    padding: 0 1rem;
+    background: #444;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+}
+
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.tag {
+    background: rgba(51, 181, 229, 0.2);
+    border: 1px solid rgba(51, 181, 229, 0.5);
+    color: #33b5e5;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tag.exclusion {
+    background: rgba(255, 68, 68, 0.2);
+    border: 1px solid rgba(255, 68, 68, 0.5);
+    color: #ff4444;
+}
+
+.tag button {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-weight: bold;
+    padding: 0;
+}
+
+.formActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.cancelBtn {
+    padding: 0.8rem 1.5rem;
+    background: transparent;
+    border: 1px solid #666;
+    color: #ccc;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.submitBtn {
+    padding: 0.8rem 1.5rem;
+    background: #00C851;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.submitBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

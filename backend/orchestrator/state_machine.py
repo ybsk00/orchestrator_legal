@@ -44,6 +44,8 @@ class Phase(str, Enum):
     
     # 상태
     WAIT_USER = "WAIT_USER"
+    USER_GATE = "USER_GATE"  # 라운드 종료 후 사용자 개입 대기
+    END_GATE = "END_GATE"    # 최종 종료 전 대기
     FINALIZE_DONE = "FINALIZE_DONE"
 
 
@@ -53,17 +55,17 @@ PHASE_TRANSITIONS = {
     Phase.A1_R1_PLAN: Phase.A2_R1_CRIT,
     Phase.A2_R1_CRIT: Phase.A3_R1_SYN,
     Phase.A3_R1_SYN: Phase.V_R1_AUDIT,
-    Phase.V_R1_AUDIT: Phase.WAIT_USER,
+    Phase.V_R1_AUDIT: Phase.USER_GATE,  # Round 1 종료 -> USER_GATE
     
     # Round 2 (Agent1 없음!)
     Phase.A2_R2_CRIT: Phase.A3_R2_SYN,
     Phase.A3_R2_SYN: Phase.V_R2_GATE,
-    Phase.V_R2_GATE: Phase.WAIT_USER,  # or FINALIZE_DONE if No-Go
+    Phase.V_R2_GATE: Phase.USER_GATE,  # Round 2 종료 -> USER_GATE
     
     # Round 3
     Phase.A2_R3_LASTCHECK: Phase.A3_R3_FINAL,
     Phase.A3_R3_FINAL: Phase.V_R3_SIGNOFF,
-    Phase.V_R3_SIGNOFF: Phase.FINALIZE_DONE,
+    Phase.V_R3_SIGNOFF: Phase.END_GATE,  # Round 3 종료 -> END_GATE
 }
 
 

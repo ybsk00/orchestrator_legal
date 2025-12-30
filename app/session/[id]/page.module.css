@@ -419,14 +419,228 @@
         width: 100%;
         height: 300px;
         min-width: unset;
-        max-width: unset;
-        border-right: none;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        gap: 0.75rem;
+        padding: 1.5rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        background: #000;
     }
 
-    .chatSection {
-        width: 100%;
-        height: 500px;
-        /* 모바일에서 고정 높이 */
+    .input {
+        flex: 1;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        color: #fff;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
     }
-}
+
+    .input:focus {
+        outline: none;
+        border-color: #6366f1;
+    }
+
+    .sendBtn {
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+        font-weight: 500;
+        color: #fff;
+        background: #6366f1;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+    }
+
+    .sendBtn:hover:not(:disabled) {
+        background: #4f46e5;
+    }
+
+    .sendBtn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* 모달 공통 */
+    .modalOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .modal {
+        background: #1a1a2e;
+        padding: 2rem;
+        border-radius: 16px;
+        max-width: 400px;
+        text-align: center;
+    }
+
+    .modal h3 {
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+        color: #fff;
+    }
+
+    .modal p {
+        font-size: 0.9rem;
+        color: #888;
+        margin-bottom: 0.5rem;
+    }
+
+    .modalActions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+        justify-content: center;
+    }
+
+    .modalActions button {
+        padding: 0.75rem 1.5rem;
+        font-size: 0.9rem;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+    }
+
+    .modalActions button.primary {
+        background: #dc2626;
+    }
+
+    .modalActions button:hover {
+        opacity: 0.9;
+    }
+
+    /* 리포트 모달 */
+    .reportModal {
+        background: #fff;
+        color: #1a1a1a;
+        width: 90%;
+        max-width: 800px;
+        max-height: 85vh;
+        border-radius: 16px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    }
+
+    .reportModalHeader {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.5rem 2rem;
+        border-bottom: 1px solid #e5e5e5;
+        background: #fafafa;
+    }
+
+    .reportModalHeader h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    .reportModalActions {
+        display: flex;
+        gap: 0.75rem;
+    }
+
+    .reportModalActions button {
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+        font-weight: 500;
+        border-radius: 8px;
+        background: #f0f0f0;
+        color: #333;
+        transition: all 0.2s ease;
+    }
+
+    .reportModalActions button:hover {
+        background: #e5e5e5;
+    }
+
+    .reportModalContent {
+        flex: 1;
+        overflow-y: auto;
+        padding: 2rem;
+    }
+
+    .reportLoading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 4rem;
+        gap: 1rem;
+    }
+
+    .reportLoading p {
+        font-size: 1rem;
+        color: #666;
+    }
+
+    .spinner {
+        width: 48px;
+        height: 48px;
+        border: 4px solid #e5e5e5;
+        border-top-color: #6366f1;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    .reportText {
+        white-space: pre-wrap;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 1rem;
+        line-height: 1.8;
+        color: #333;
+        margin: 0;
+    }
+
+    /* 반응형 */
+    @media (max-width: 900px) {
+        .splitLayout {
+            flex-direction: column;
+            height: auto;
+            overflow: visible;
+        }
+
+        .avatarSection {
+            width: 100%;
+            height: 300px;
+            min-width: unset;
+            max-width: unset;
+            border-right: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .chatSection {
+            width: 100%;
+            height: 500px;
+            /* 모바일에서 고정 높이 */
+        }
+    }
+
+    /* 게이트 컨테이너 */
+    .gateContainer {
+        margin-top: 1.5rem;
+        padding: 0 1rem 1rem 1rem;
+        animation: fadeIn 0.5s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }

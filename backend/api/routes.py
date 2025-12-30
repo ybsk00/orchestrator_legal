@@ -71,6 +71,12 @@ class UserMessageResponse(BaseModel):
     phase: Optional[str] = None
 
 
+class SteeringRequest(BaseModel):
+    action: str  # skip, input, finalize, extend, new_session
+    steering: Optional[Dict[str, Any]] = None
+    request_id: Optional[str] = None  # Idempotency key
+
+
 class SessionResponse(BaseModel):
     id: str
     status: str
@@ -116,6 +122,7 @@ async def execute_phase(session_id: str, phase: str, config: dict) -> str:
     # 이전 대화 맥락 구성
     case_file_summary = ""
     criticisms_last_round = ""
+    steering_block = ""
     
     if case_file_data:
         decisions = case_file_data.get('decisions', [])
@@ -126,6 +133,25 @@ async def execute_phase(session_id: str, phase: str, config: dict) -> str:
         criticisms = case_file_data.get('criticisms_last_round', [])
         if criticisms:
             criticisms_last_round = ", ".join(criticisms)
+            
+        # Steering 데이터 구성
+        steering = case_file_data.get('steering')
+        if steering:
+            # Steering Block 템플릿
+            steering_block = f"""
+## [USER STEERING — MUST FOLLOW]
+Goal: {steering.get('goal', 'None')}
+Priority order: {steering.get('priority', 'None')}
+Hard constraints (must satisfy): {steering.get('constraints', [])}
+Hard exclusions (must not propose): {steering.get('exclusions', [])}
+User note: {steering.get('free_text', '')}
+
+### RULES
+1) Hard constraints를 만족하지 못하는 제안은 실패입니다.
+2) Hard exclusions에 해당하는 제안은 금지이며 포함되면 실패입니다.
+3) Output은 Goal/Priority에 맞춰 최적화해야 합니다.
+4) 응답 끝에 `Steering Compliance Check: OK/NOT OK`로 준수 여부를 자가 점검하세요.
+"""
     
     # 이벤트 발송
     await sse_event_manager.emit(session_id, EventType.SPEAKER_CHANGE, {"active_speaker": agent_name})
@@ -135,7 +161,7 @@ async def execute_phase(session_id: str, phase: str, config: dict) -> str:
         "phase": phase
     })
     
-    # 프롬프트 구성
+    # 프롬프트 구성 (Steering Block은 BaseAgent 내부에서 처리)
     prompt = agent.system_prompt
     prompt = prompt.replace("{{max_chars}}", str(config.get("max_chars", 300)))
     prompt = prompt.replace("{{category}}", session_data.get("category", "general"))
@@ -143,20 +169,54 @@ async def execute_phase(session_id: str, phase: str, config: dict) -> str:
     prompt = prompt.replace("{{case_file_summary}}", case_file_summary)
     prompt = prompt.replace("{{criticisms_last_round}}", criticisms_last_round)
     
-    # 스트리밍 실행
+    # 스트리밍 실행 (재시도 로직 포함)
+    retry_count = 0
+    max_retries = 1
     full_response = ""
-    try:
-        async for chunk in agent.stream_response(
-            messages=[],
-            user_message=f"주제: {session_data.get('topic')}",
-            case_file_summary=case_file_summary,
-            category=session_data.get("category", "general")
-        ):
-            full_response += chunk
-            await sse_event_manager.emit(session_id, EventType.MESSAGE_STREAM_CHUNK, {"text": chunk})
-    except Exception as e:
-        logger.error(f"Agent execution error: {e}")
-        full_response = f"[오류 발생: {str(e)}]"
+    
+    while retry_count <= max_retries:
+        full_response = ""
+        
+        # 재시도 시 프롬프트에 피드백 추가
+        current_prompt = prompt
+        if retry_count > 0:
+            current_prompt += f"\n\n[SYSTEM: 이전 응답에서 Steering 위반이 감지되었습니다. 위반 사유: {violation_reason}. 제약 조건을 철저히 준수하여 다시 작성하세요.]"
+            # BaseAgent의 _build_prompt가 아니라 여기서 직접 수정해야 함. 
+            # 하지만 BaseAgent 구조상 system_prompt를 직접 수정하기 어려우므로, 
+            # stream_response의 user_message에 추가하는 것이 나음.
+        
+        retry_message_suffix = ""
+        if retry_count > 0:
+            retry_message_suffix = f"\n\n[SYSTEM: 이전 응답에서 Steering 위반이 감지되었습니다. 위반 사유: {violation_reason}. 제약 조건을 철저히 준수하여 다시 작성하세요.]"
+
+        try:
+            async for chunk in agent.stream_response(
+                messages=[],
+                user_message=f"주제: {session_data.get('topic')}{retry_message_suffix}",
+                case_file_summary=case_file_summary,
+                category=session_data.get("category", "general"),
+                steering_block=steering_block
+            ):
+                full_response += chunk
+                await sse_event_manager.emit(session_id, EventType.MESSAGE_STREAM_CHUNK, {"text": chunk})
+        except Exception as e:
+            logger.error(f"Agent execution error: {e}")
+            full_response = f"[오류 발생: {str(e)}]"
+            break
+            
+        # Compliance Check
+        violation_reason = check_steering_compliance(full_response, steering)
+        if violation_reason:
+            logger.warning(f"[Guardrail] Violation detected: {violation_reason}")
+            if retry_count < max_retries:
+                await sse_event_manager.emit(session_id, EventType.MESSAGE_STREAM_CHUNK, {"text": "\n\n🔴 [시스템: Steering 위반 감지됨. 자동 재작성 중...]\n\n"})
+                retry_count += 1
+                continue
+            else:
+                logger.warning("[Guardrail] Max retries reached. Proceeding with violation.")
+                break
+        else:
+            break
     
     # 스트리밍 종료
     await sse_event_manager.emit(session_id, EventType.MESSAGE_STREAM_END, {
@@ -170,6 +230,8 @@ async def execute_phase(session_id: str, phase: str, config: dict) -> str:
         "round_index": current_round,
         "phase": phase
     })
+    
+    # Agent2 리스크 태그 추출 및 저장
     
     # Agent2 리스크 태그 추출 및 저장
     if agent_name == "agent2":
@@ -229,7 +291,7 @@ async def execute_round(session_id: str, current_round: int):
     gate_status = None
     
     # Phase 순차 실행
-    while not is_wait_user_phase(phase) and not is_final_phase(phase):
+    while not is_wait_user_phase(phase) and not is_final_phase(phase) and phase not in [Phase.USER_GATE.value, Phase.END_GATE.value]:
         # 세션 상태 업데이트
         await db.update_session(session_id, {
             "phase": phase,
@@ -249,13 +311,13 @@ async def execute_round(session_id: str, current_round: int):
         result = await execute_phase(session_id, phase, config)
         
         # Verifier gate 결과 추출
-        if "V_R2_GATE" in phase or "V_R3_SIGNOFF" in phase:
+        if "V_R2_GATE" in phase or "V_R3_SIGNOFF" in phase or "V_R1_AUDIT" in phase:
             gate_status = extract_gate_status(result)
         
         # 다음 phase로 전이
         phase = get_next_phase(phase, gate_status)
     
-    # 라운드 종료
+    # 라운드 종료 (USER_GATE, END_GATE, WAIT_USER, FINALIZE_DONE)
     await db.update_session(session_id, {"phase": phase})
     
     if is_final_phase(phase):
@@ -271,16 +333,29 @@ async def execute_round(session_id: str, current_round: int):
         
         await db.update_session(session_id, {"status": "finalized"})
         await sse_event_manager.emit(session_id, EventType.SESSION_END, {})
-    else:
-        # WAIT_USER → 자동으로 다음 라운드 진행 (사용자 입력 대기 없음)
-        await sse_event_manager.emit(session_id, EventType.ROUND_END, {"round_index": current_round})
         
-        # 다음 라운드가 있으면 자동 진행
-        next_round = current_round + 1
-        if next_round <= MAX_ROUNDS:
-            logger.info(f"[ExecuteRound] Auto-continuing to Round {next_round}")
-            await asyncio.sleep(1)  # 잠시 대기 (UI 업데이트용)
-            await execute_round(session_id, next_round)
+    elif phase in [Phase.USER_GATE.value, Phase.END_GATE.value]:
+        # USER_GATE / END_GATE 도달 -> 사용자 개입 대기 (자동 진행 중단)
+        logger.info(f"[ExecuteRound] Reached gate: {phase}. Waiting for user intervention.")
+        
+        # 게이트 렌더링용 데이터 수집
+        case_file = await db.get_case_file(session_id)
+        decisions = case_file.get("decisions", [])
+        open_issues = case_file.get("open_issues", [])
+        
+        # ROUND_END 이벤트 발송 (게이트 데이터 포함)
+        await sse_event_manager.emit(session_id, EventType.ROUND_END, {
+            "round_index": current_round,
+            "phase": phase,
+            "decision_summary": decisions[-1] if decisions else "진행 중...",
+            "what_changed": [], # TODO: 변경점 추적 로직 추가 필요
+            "open_issues": open_issues[-3:],
+            "verifier_gate_status": gate_status or "Go"
+        })
+        
+    else:
+        # WAIT_USER (기존 로직 유지 - 하지만 v2.2에서는 USER_GATE를 주로 사용)
+        await sse_event_manager.emit(session_id, EventType.ROUND_END, {"round_index": current_round})
 
 
 def extract_gate_status(response: str) -> Optional[str]:
@@ -292,6 +367,45 @@ def extract_gate_status(response: str) -> Optional[str]:
         return "Conditional"
     elif "approved" in response_lower or "go" in response_lower:
         return "Go"
+    return None
+
+
+# === 가드레일 (Guardrails) ===
+
+EXCLUSION_PATTERNS = {
+    "no_email": ["email", "이메일", "메일", "mail", "newsletter", "뉴스레터", "cold call", "콜드콜"],
+    "no_meeting": ["meeting", "미팅", "회의", "zoom", "google meet", "대면"],
+    "no_cost": ["cost", "비용", "budget", "예산", "paid", "유료"],
+}
+
+def check_steering_compliance(response: str, steering: Optional[Dict[str, Any]]) -> Optional[str]:
+    """
+    Steering 준수 여부 확인
+    Returns: 위반 사유 (None이면 준수)
+    """
+    if not steering:
+        return None
+        
+    response_lower = response.lower()
+    
+    # 1. Self-check 확인
+    if "steering compliance check: not ok" in response_lower:
+        return "Self-reported violation (NOT OK)"
+        
+    # 2. Hard Exclusions 확인
+    exclusions = steering.get('exclusions', [])
+    for exc in exclusions:
+        # 1) 직접 키워드 매칭
+        if exc.lower() in response_lower:
+            return f"Exclusion violation: '{exc}' found in response"
+            
+        # 2) 패턴 매칭 (EXCLUSION_PATTERNS 테이블 활용)
+        # exc가 "no_email" 같은 키라면 패턴 목록 확인
+        patterns = EXCLUSION_PATTERNS.get(exc, [])
+        for pattern in patterns:
+            if pattern in response_lower:
+                return f"Exclusion violation: '{exc}' pattern '{pattern}' found"
+                
     return None
 
 
@@ -418,6 +532,74 @@ async def send_message_endpoint(session_id: str, request: UserMessageRequest, ba
         raise
     except Exception as e:
         logger.error(f"[SendMessage] 오류 발생: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/sessions/{session_id}/steering")
+async def steering_endpoint(session_id: str, request: SteeringRequest, background_tasks: BackgroundTasks):
+    """
+    사용자 개입(Steering) 처리 (v2.2)
+    
+    USER_GATE/END_GATE 상태에서 다음 동작 결정
+    - skip: 다음 라운드 진행
+    - input: Steering 데이터 저장 후 진행
+    - finalize: 종료
+    - extend: 라운드 연장
+    - new_session: 새 세션
+    """
+    try:
+        session = await db.get_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+            
+        current_round = session.get("round_index", 0)
+        
+        # Idempotency Check (TODO: 실제 구현 필요, 여기선 로그만)
+        if request.request_id:
+            logger.info(f"[Steering] Request ID: {request.request_id}")
+            
+        action = request.action
+        logger.info(f"[Steering] Action: {action}, Session: {session_id}")
+        
+        if action == "finalize":
+            # 즉시 종료 처리
+            await finalize_session_endpoint(session_id)
+            return {"status": "finalized"}
+            
+        elif action == "extend":
+            # 라운드 연장 (최대 1회)
+            # TODO: extend_count 관리 로직 추가 필요
+            # 여기서는 단순히 다음 라운드로 진행하도록 처리
+            pass
+            
+        elif action == "new_session":
+            # 결론 고정 후 새 세션 (클라이언트에서 처리하도록 유도하거나 여기서 생성)
+            # 여기서는 현재 세션 종료만 처리
+            await finalize_session_endpoint(session_id)
+            return {"status": "new_session_created"}
+            
+        elif action == "input":
+            # Steering 데이터 저장
+            if request.steering:
+                await db.save_case_file(session_id, {
+                    "steering": request.steering
+                })
+                logger.info(f"[Steering] Saved steering data: {request.steering}")
+        
+        # skip 또는 input 처리 후 다음 라운드 진행
+        # system_event=SKIP을 사용하는 대신, 명시적으로 start_round 호출
+        # Race Condition 방지를 위해 상태만 변경하고 백그라운드에서 실행
+        
+        # 다음 라운드 시작 이벤트 발행 (UI 반응용)
+        await sse_event_manager.emit(session_id, EventType.ROUND_START, {"round_index": current_round + 1})
+        
+        # 실제 실행은 백그라운드에서
+        background_tasks.add_task(start_round, session_id)
+        
+        return {"status": "processed", "action": action}
+        
+    except Exception as e:
+        logger.error(f"[Steering] Error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

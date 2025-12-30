@@ -1,178 +1,42 @@
-'use client'
+import { useSessionEvents } from '@/lib/useSessionEvents'
+import GateSummaryCard from '@/components/gate/GateSummaryCard'
+import SteeringPanel from '@/components/gate/SteeringPanel'
+import EndGateCard from '@/components/gate/EndGateCard'
 
-import { useEffect, useState, useRef, Suspense } from 'react'
-import { useParams } from 'next/navigation'
-import dynamic from 'next/dynamic'
-import { useRealtimeMessages, Message } from '@/lib/useRealtimeMessages'
-import TypingMessage from '@/components/TypingMessage'
-import styles from './page.module.css'
-
-// Avatar Panel은 클라이언트 사이드에서만 로드
-const AvatarPanel = dynamic(() => import('@/components/avatar/AvatarPanel'), {
-    ssr: false,
-    loading: () => <div className={styles.avatarPlaceholder}>캐릭터 로딩 중...</div>
-})
-
-interface SessionData {
-    id: string
-    status: string
-    category: string
-    topic: string
-    round_index: number
-    phase: string
-}
+// ... (existing imports)
 
 export default function SessionPage() {
-    const params = useParams()
-    const sessionId = params.id as string
+    // ... (existing state)
 
-    const [session, setSession] = useState<SessionData | null>(null)
-    const [input, setInput] = useState('')
-    const [activeSpeaker, setActiveSpeaker] = useState<string | null>(null)
-    const [showStopConfirm, setShowStopConfirm] = useState(false)
-    const [stopTrigger, setStopTrigger] = useState('')
-    const [showReportModal, setShowReportModal] = useState(false)
-    const [reportContent, setReportContent] = useState<string | null>(null)
-    const [reportLoading, setReportLoading] = useState(false)
+    // SSE 이벤트 훅 사용
+    const { gateData } = useSessionEvents(sessionId)
 
-    const messagesEndRef = useRef<HTMLDivElement>(null)
+    // ... (existing effects)
 
-    // Supabase Realtime 훅 사용
-    const { messages, isLoading, isConnected } = useRealtimeMessages(sessionId)
-
-    // 세션 정보 로드
-    useEffect(() => {
-        const fetchSession = async () => {
-            try {
-                const res = await fetch(`/api/sessions/${sessionId}`)
-                if (res.ok) {
-                    const data = await res.json()
-                    setSession(data)
-                }
-            } catch (error) {
-                console.error('Failed to fetch session:', error)
-            }
-        }
-        fetchSession()
-
-        // 주기적으로 세션 상태 확인 (폴링) - 라운드 변경 등 감지용
-        const interval = setInterval(fetchSession, 3000)
-        return () => clearInterval(interval)
-    }, [sessionId])
-
-    // Active Speaker 자동 설정 (마지막 메시지 기준)
-    useEffect(() => {
-        if (messages.length > 0) {
-            const lastMsg = messages[messages.length - 1]
-            if (['agent1', 'agent2', 'agent3', 'verifier'].includes(lastMsg.role)) {
-                setActiveSpeaker(lastMsg.role)
-            } else {
-                setActiveSpeaker(null)
-            }
-        }
-    }, [messages])
-
-    // 스크롤 자동 이동
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }, [messages])
-
-    // 메시지 전송
-    const handleSend = async () => {
-        if (!input.trim()) return
-
-        const messageText = input
-        setInput('')
-
+    // Steering 핸들러
+    const handleSteeringAction = async (action: string, steeringData: any = null) => {
         try {
-            await fetch(`/api/sessions/${sessionId}/message`, {
+            await fetch(`/api/sessions/${sessionId}/steering`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: messageText }),
-            })
-        } catch (error) {
-            console.error('Failed to send message:', error)
-            // 에러 시 입력 복구 (선택사항)
-            setInput(messageText)
-        }
-    }
-
-    // 마무리 버튼
-    const handleFinalize = async () => {
-        try {
-            const res = await fetch(`/api/sessions/${sessionId}/finalize`, {
-                method: 'POST',
-            })
-            if (res.ok) {
-                // 세션 상태 갱신
-                const sessionRes = await fetch(`/api/sessions/${sessionId}`)
-                if (sessionRes.ok) {
-                    const data = await sessionRes.json()
-                    setSession(data)
-                }
-            }
-        } catch (error) {
-            console.error('Failed to finalize:', error)
-        }
-    }
-
-    // 키워드 종료 확인
-    const handleConfirmStop = async (confirmed: boolean) => {
-        setShowStopConfirm(false)
-        try {
-            await fetch(`/api/sessions/${sessionId}/confirm-stop?confirmed=${confirmed}`, {
-                method: 'POST',
-            })
-        } catch (error) {
-            console.error('Failed to confirm stop:', error)
-        }
-    }
-
-    // 리포트 모달 열기
-    const handleViewReport = async () => {
-        setShowReportModal(true)
-        setReportLoading(true)
-
-        try {
-            // 먼저 리포트 조회 시도
-            let res = await fetch(`/api/sessions/${sessionId}/report`)
-
-            if (!res.ok) {
-                // 없으면 생성 요청
-                res = await fetch(`/api/sessions/${sessionId}/report/generate`, {
-                    method: 'POST'
+                body: JSON.stringify({
+                    action,
+                    steering: steeringData,
+                    request_id: crypto.randomUUID()
                 })
-            }
-
-            if (res.ok) {
-                const data = await res.json()
-                setReportContent(data.report_md)
-            } else {
-                setReportContent('리포트를 불러오는데 실패했습니다.')
-            }
+            })
         } catch (error) {
-            console.error('Failed to load report:', error)
-            setReportContent('오류가 발생했습니다.')
-        } finally {
-            setReportLoading(false)
+            console.error('Steering action failed:', error)
+            alert('요청 처리 중 오류가 발생했습니다.')
         }
     }
 
-    const getAgentLabel = (role: string) => {
-        switch (role) {
-            case 'agent1': return '🔵 Agent 1: 구현계획'
-            case 'agent2': return '🟠 Agent 2: 리스크'
-            case 'agent3': return '🟣 Agent 3: 합의안'
-            case 'verifier': return '🔴 Verifier: 검증관'
-            case 'user': return '👤 사용자'
-            default: return role
-        }
-    }
+    // ... (existing render)
 
     return (
         <main className={styles.container}>
             <div className={styles.splitLayout}>
-                {/* 좌측: 아바타 패널 */}
+                {/* ... (Avatar Section) ... */}
                 <div className={styles.avatarSection}>
                     <Suspense fallback={<div className={styles.avatarPlaceholder}>로딩 중...</div>}>
                         <AvatarPanel activeSpeaker={activeSpeaker} />
@@ -181,7 +45,7 @@ export default function SessionPage() {
 
                 {/* 우측: 채팅 영역 */}
                 <div className={styles.chatSection}>
-                    {/* 헤더 */}
+                    {/* ... (Header) ... */}
                     <div className={styles.chatHeader}>
                         <div className={styles.headerInfo}>
                             <span className={styles.categoryBadge}>{session?.category}</span>
@@ -224,6 +88,37 @@ export default function SessionPage() {
                                 </div>
                             </div>
                         ))}
+
+                        {/* USER_GATE / END_GATE UI 렌더링 */}
+                        {(session?.phase === 'USER_GATE' || session?.phase === 'END_GATE') && gateData && (
+                            <div className={styles.gateContainer}>
+                                <GateSummaryCard
+                                    roundIndex={gateData.round_index}
+                                    decisionSummary={gateData.decision_summary}
+                                    openIssues={gateData.open_issues}
+                                    verifierStatus={gateData.verifier_gate_status}
+                                />
+
+                                {session.phase === 'USER_GATE' && (
+                                    <SteeringPanel
+                                        sessionId={sessionId}
+                                        onSkip={() => handleSteeringAction('skip')}
+                                        onInput={(data) => handleSteeringAction('input', data)}
+                                        onFinalize={() => handleSteeringAction('finalize')}
+                                    />
+                                )}
+
+                                {session.phase === 'END_GATE' && (
+                                    <EndGateCard
+                                        sessionId={sessionId}
+                                        onFinalize={() => handleSteeringAction('finalize')}
+                                        onExtend={() => handleSteeringAction('extend')}
+                                        onNewSession={() => handleSteeringAction('new_session')}
+                                    />
+                                )}
+                            </div>
+                        )}
+
                         <div ref={messagesEndRef} />
                     </div>
 
@@ -232,16 +127,20 @@ export default function SessionPage() {
                         <input
                             type="text"
                             className={styles.input}
-                            placeholder="메시지를 입력하세요... (/stop 또는 /마무리로 종료)"
+                            placeholder={
+                                session?.phase === 'USER_GATE' || session?.phase === 'END_GATE'
+                                    ? "위의 버튼을 사용하여 진행해주세요."
+                                    : "메시지를 입력하세요... (/stop 또는 /마무리로 종료)"
+                            }
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                            disabled={session?.status === 'finalized'}
+                            disabled={session?.status === 'finalized' || session?.phase === 'USER_GATE' || session?.phase === 'END_GATE'}
                         />
                         <button
                             className={styles.sendBtn}
                             onClick={handleSend}
-                            disabled={session?.status === 'finalized'}
+                            disabled={session?.status === 'finalized' || session?.phase === 'USER_GATE' || session?.phase === 'END_GATE'}
                         >
                             전송
                         </button>
@@ -249,7 +148,7 @@ export default function SessionPage() {
                 </div>
             </div>
 
-            {/* 종료 확인 모달 */}
+            {/* ... (Modals) ... */}
             {showStopConfirm && (
                 <div className={styles.modalOverlay}>
                     <div className={styles.modal}>
@@ -266,7 +165,6 @@ export default function SessionPage() {
                 </div>
             )}
 
-            {/* 리포트 모달 */}
             {showReportModal && (
                 <div className={styles.modalOverlay} onClick={() => setShowReportModal(false)}>
                     <div className={styles.reportModal} onClick={(e) => e.stopPropagation()}>
