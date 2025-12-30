@@ -344,13 +344,10 @@ async def generate_report(session_id: str):
         raise HTTPException(status_code=500, detail=f"Report generation failed: {str(e)}")
 
     # 4. 저장
-    report_data = {
-        "report_json": {"content": report_content},
-        "report_md": report_content
-    }
-    await db.save_final_report(session_id, report_data)
+    report_json = {"content": report_content}
+    await db.save_final_report(session_id, report_json, report_content)
     
-    return report_data
+    return {"report_json": report_json, "report_md": report_content}
 
 
 
