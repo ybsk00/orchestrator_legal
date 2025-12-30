@@ -82,7 +82,7 @@ export default function SessionPage() {
         setInput('')
 
         try {
-            await fetch(`/api/sessions/${sessionId}/messages`, {
+            await fetch(`/api/sessions/${sessionId}/message`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: messageText }),
