@@ -1,175 +1,177 @@
 'use client'
 
-import { useState, Suspense } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Environment, ContactShadows } from '@react-three/drei'
+import { useEffect, useRef } from 'react'
+import Link from 'next/link'
 import styles from './page.module.css'
-import AgentAvatar from '@/components/scene/AgentAvatar'
 
-type Category = 'newbiz' | 'marketing' | 'dev' | 'domain'
+// Animated particles background
+function AnimatedBackground() {
+    const canvasRef = useRef<HTMLCanvasElement>(null)
 
-const CATEGORIES: { value: Category; label: string; description: string }[] = [
-    { value: 'newbiz', label: '신규사업', description: '새로운 비즈니스 아이디어 검증' },
-    { value: 'marketing', label: '마케팅', description: '마케팅 전략 및 캠페인 설계' },
-    { value: 'dev', label: '개발', description: '기술 아키텍처 및 구현 계획' },
-    { value: 'domain', label: '영역', description: '운영/프로세스/정책 의사결정' },
-]
+    useEffect(() => {
+        const canvas = canvasRef.current
+        if (!canvas) return
 
-function HeroScene() {
-    return (
-        <Canvas camera={{ position: [0, 2, 6], fov: 45 }}>
-            <ambientLight intensity={0.5} />
-            <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} castShadow />
-            <Environment preset="city" />
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
 
-            <group position={[0, -1, 0]}>
-                {/* Agent 1 */}
-                <AgentAvatar
-                    agentId="agent1"
-                    modelPath="/models/agent1.glb"
-                    position={[-2, 0, 0]}
-                    rotation={[0, 0.5, 0]}
-                    isSpeaking={false}
-                    fallbackColor="#10b981"
-                />
-                {/* Agent 2 */}
-                <AgentAvatar
-                    agentId="agent2"
-                    modelPath="/models/agent2.glb"
-                    position={[-0.7, 0, 0.5]}
-                    rotation={[0, 0.2, 0]}
-                    isSpeaking={false}
-                    fallbackColor="#f59e0b"
-                />
-                {/* Agent 3 */}
-                <AgentAvatar
-                    agentId="agent3"
-                    modelPath="/models/agent3.glb"
-                    position={[0.7, 0, 0.5]}
-                    rotation={[0, -0.2, 0]}
-                    isSpeaking={false}
-                    fallbackColor="#8b5cf6"
-                />
-                {/* Verifier */}
-                <AgentAvatar
-                    agentId="verifier"
-                    modelPath="/models/verifier.glb"
-                    position={[2, 0, 0]}
-                    rotation={[0, -0.5, 0]}
-                    isSpeaking={false}
-                    fallbackColor="#ef4444"
-                />
-                <ContactShadows resolution={1024} scale={10} blur={1} opacity={0.5} far={1} color="#000000" />
-            </group>
+        let animationId: number
+        const particles: { x: number; y: number; vx: number; vy: number; size: number; alpha: number }[] = []
+        const particleCount = 80
 
-            <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={Math.PI / 3} maxPolarAngle={Math.PI / 2} />
-        </Canvas>
-    )
-}
+        const resize = () => {
+            canvas.width = window.innerWidth
+            canvas.height = window.innerHeight
+        }
+        resize()
+        window.addEventListener('resize', resize)
 
-export default function Home() {
-    const [category, setCategory] = useState<Category | ''>('')
-    const [topic, setTopic] = useState('')
-    const [isLoading, setIsLoading] = useState(false)
+        // Initialize particles
+        for (let i = 0; i < particleCount; i++) {
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                vx: (Math.random() - 0.5) * 0.5,
+                vy: (Math.random() - 0.5) * 0.5,
+                size: Math.random() * 2 + 1,
+                alpha: Math.random() * 0.5 + 0.2
+            })
+        }
 
-    const handleStartSession = async () => {
-        if (!category || !topic.trim()) return
+        const animate = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-        setIsLoading(true)
-        try {
-            const response = await fetch('/api/sessions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ category, topic }),
+            // Draw connections
+            particles.forEach((p1, i) => {
+                particles.slice(i + 1).forEach(p2 => {
+                    const dx = p1.x - p2.x
+                    const dy = p1.y - p2.y
+                    const dist = Math.sqrt(dx * dx + dy * dy)
+                    if (dist < 150) {
+                        ctx.beginPath()
+                        ctx.strokeStyle = `rgba(99, 102, 241, ${0.15 * (1 - dist / 150)})`
+                        ctx.lineWidth = 1
+                        ctx.moveTo(p1.x, p1.y)
+                        ctx.lineTo(p2.x, p2.y)
+                        ctx.stroke()
+                    }
+                })
             })
 
-            if (response.ok) {
-                const data = await response.json()
-                // 세션 페이지로 이동
-                window.location.href = `/session/${data.session_id}`
-            }
-        } catch (error) {
-            console.error('Failed to create session:', error)
-        } finally {
-            setIsLoading(false)
-        }
-    }
+            // Draw and update particles
+            particles.forEach(p => {
+                ctx.beginPath()
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
+                ctx.fillStyle = `rgba(139, 92, 246, ${p.alpha})`
+                ctx.fill()
 
+                p.x += p.vx
+                p.y += p.vy
+
+                if (p.x < 0 || p.x > canvas.width) p.vx *= -1
+                if (p.y < 0 || p.y > canvas.height) p.vy *= -1
+            })
+
+            animationId = requestAnimationFrame(animate)
+        }
+        animate()
+
+        return () => {
+            window.removeEventListener('resize', resize)
+            cancelAnimationFrame(animationId)
+        }
+    }, [])
+
+    return <canvas ref={canvasRef} className={styles.canvas} />
+}
+
+const AGENTS = [
+    { id: 'agent1', name: 'Agent 1', role: '구현계획 전문가', desc: '구체적인 실행 방안과 KPI를 제시합니다', color: '#10b981' },
+    { id: 'agent2', name: 'Agent 2', role: '리스크 분석가', desc: '허점과 리스크를 분석하고 검증 방안을 제시합니다', color: '#f59e0b' },
+    { id: 'agent3', name: 'Agent 3', role: '합의안 설계자', desc: '절충안과 개선된 실행 계획을 도출합니다', color: '#8b5cf6' },
+    { id: 'verifier', name: 'Verifier', role: '검증관', desc: '법적 안전장치 및 리스크 대응을 검증합니다', color: '#ef4444' },
+]
+
+const FEATURES = [
+    { icon: '🤖', title: '다중 AI 에이전트', desc: '4명의 전문 AI가 서로 다른 관점에서 토론합니다' },
+    { icon: '💡', title: '자동 합의 도출', desc: '여러 라운드를 거쳐 최적의 합의안을 생성합니다' },
+    { icon: '📊', title: '실시간 협업', desc: '실시간으로 AI 토론 과정을 확인할 수 있습니다' },
+    { icon: '📑', title: '최종 리포트', desc: '토론 결과를 정리한 상세 리포트를 제공합니다' },
+]
+
+export default function HomePage() {
     return (
         <main className={styles.main}>
-            <div className={styles.container}>
-                <header className={styles.header}>
-                    <div className={styles.heroScene}>
-                        <Suspense fallback={null}>
-                            <HeroScene />
-                        </Suspense>
-                    </div>
-                    <h1 className={styles.title}>🤖 3 에이전트 오케스트레이터</h1>
-                    <p className={styles.subtitle}>
-                        AI에게 회의 새로운 아이디어 및 계획을 AI에게 회의를 맡겨서 만들어보는 시스템입니다.
-                    </p>
-                </header>
+            <AnimatedBackground />
 
-                <section className={styles.categorySection}>
-                    <h2>카테고리 선택</h2>
-                    <div className={styles.categoryGrid}>
-                        {CATEGORIES.map((cat) => (
-                            <button
-                                key={cat.value}
-                                className={`${styles.categoryCard} ${category === cat.value ? styles.selected : ''}`}
-                                onClick={() => setCategory(cat.value)}
-                            >
-                                <span className={styles.categoryLabel}>{cat.label}</span>
-                                <span className={styles.categoryDesc}>{cat.description}</span>
-                            </button>
+            <div className={styles.content}>
+                {/* Hero Section */}
+                <section className={styles.hero}>
+                    <div className={styles.badge}>AI-Powered Collaboration</div>
+                    <h1 className={styles.title}>
+                        AI 회의 <span className={styles.gradient}>협업시스템</span>
+                    </h1>
+                    <p className={styles.subtitle}>
+                        새로운 아이디어와 계획을 AI에게 회의를 맡겨서 만들어보세요.
+                        <br />
+                        4명의 AI 전문가가 다양한 관점에서 토론하고 최적의 결론을 도출합니다.
+                    </p>
+                    <div className={styles.heroButtons}>
+                        <Link href="/login" className={styles.primaryButton}>
+                            시작하기 →
+                        </Link>
+                        <Link href="/dashboard" className={styles.secondaryButton}>
+                            대시보드
+                        </Link>
+                    </div>
+                </section>
+
+                {/* Features Section */}
+                <section className={styles.features}>
+                    <h2 className={styles.sectionTitle}>주요 기능</h2>
+                    <div className={styles.featureGrid}>
+                        {FEATURES.map((feature, idx) => (
+                            <div key={idx} className={styles.featureCard}>
+                                <span className={styles.featureIcon}>{feature.icon}</span>
+                                <h3>{feature.title}</h3>
+                                <p>{feature.desc}</p>
+                            </div>
                         ))}
                     </div>
                 </section>
 
-                <section className={styles.topicSection}>
-                    <h2>토론 주제 입력</h2>
-                    <textarea
-                        className={styles.topicInput}
-                        placeholder="예: 'AI 기반 고객 상담 챗봇 도입을 고려하고 있습니다. MVP 범위와 일정을 논의해주세요.'"
-                        value={topic}
-                        onChange={(e) => setTopic(e.target.value)}
-                        rows={4}
-                    />
+                {/* Agents Section */}
+                <section className={styles.agents}>
+                    <h2 className={styles.sectionTitle}>참여 에이전트</h2>
+                    <div className={styles.agentGrid}>
+                        {AGENTS.map(agent => (
+                            <div key={agent.id} className={styles.agentCard}>
+                                <div className={styles.agentAvatar} style={{ background: agent.color }}>
+                                    {agent.name.charAt(0)}
+                                </div>
+                                <span className={styles.agentName} style={{ color: agent.color }}>{agent.name}</span>
+                                <strong className={styles.agentRole}>{agent.role}</strong>
+                                <p className={styles.agentDesc}>{agent.desc}</p>
+                            </div>
+                        ))}
+                    </div>
                 </section>
 
-                <button
-                    className={styles.startButton}
-                    onClick={handleStartSession}
-                    disabled={!category || !topic.trim() || isLoading}
-                >
-                    {isLoading ? '세션 생성 중...' : '토론 시작하기'}
-                </button>
-
-                <div className={styles.agentIntro}>
-                    <h3>참여 에이전트</h3>
-                    <div className={styles.agentGrid}>
-                        <div className={styles.agentCard}>
-                            <span className="agent1" style={{ color: 'var(--agent1)' }}>Agent 1</span>
-                            <strong>구현계획 전문가</strong>
-                            <p>구체적인 실행 방안과 KPI를 제시합니다</p>
-                        </div>
-                        <div className={styles.agentCard}>
-                            <span className="agent2" style={{ color: 'var(--agent2)' }}>Agent 2</span>
-                            <strong>리스크 오피서</strong>
-                            <p>허점과 리스크를 공격하고 검증 방안을 제시합니다</p>
-                        </div>
-                        <div className={styles.agentCard}>
-                            <span className="agent3" style={{ color: 'var(--agent3)' }}>Agent 3</span>
-                            <strong>합의안 설계자</strong>
-                            <p>절충안과 개선된 실행 계획을 도출합니다</p>
-                        </div>
-                        <div className={styles.agentCard}>
-                            <span className="verifier" style={{ color: 'var(--verifier)' }}>Verifier</span>
-                            <strong>검증관</strong>
-                            <p>법적 안전장치 및 리스크 대응을 검증하고 정리합니다</p>
-                        </div>
+                {/* CTA Section */}
+                <section className={styles.cta}>
+                    <div className={styles.ctaCard}>
+                        <h2>지금 바로 시작하세요</h2>
+                        <p>로그인하여 AI 협업 시스템의 모든 기능을 경험해보세요.</p>
+                        <Link href="/login" className={styles.ctaButton}>
+                            무료로 시작하기
+                        </Link>
                     </div>
-                </div>
+                </section>
+
+                {/* Footer */}
+                <footer className={styles.footer}>
+                    <p>© 2024 AI 회의 협업시스템. All rights reserved.</p>
+                </footer>
             </div>
         </main>
     )
