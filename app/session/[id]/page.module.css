@@ -1,4 +1,5 @@
-.main {
+/* 전체 컨테이너 */
+.container {
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -7,7 +8,46 @@
     overflow: hidden;
 }
 
-.header {
+/* 좌우 분할 레이아웃 */
+.splitLayout {
+    display: flex;
+    flex: 1;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* 좌측: 아바타 패널 */
+.avatarSection {
+    width: 50%;
+    min-width: 50%;
+    max-width: 50%;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    background: #0a0a0a;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.avatarPlaceholder {
+    color: #666;
+    font-size: 1.2rem;
+}
+
+/* 우측: 채팅 영역 */
+.chatSection {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #000;
+    height: 100%;
+    min-width: 0;
+    /* Flexbox overflow fix */
+}
+
+/* 채팅 헤더 */
+.chatHeader {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -18,13 +58,13 @@
     flex-shrink: 0;
 }
 
-.sessionInfo {
+.headerInfo {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
 }
 
-.category {
+.categoryBadge {
     font-size: 0.75rem;
     padding: 0.25rem 0.5rem;
     background: rgba(99, 102, 241, 0.2);
@@ -34,10 +74,11 @@
     text-transform: uppercase;
 }
 
-.topic {
+.headerInfo h2 {
     font-size: 1.1rem;
     font-weight: 600;
     color: #fff;
+    margin: 0;
     max-width: 400px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -95,55 +136,21 @@
     background: #7c3aed;
 }
 
-/* 메인 컨텐츠 (아바타 + 채팅) */
-.contentWrapper {
-    flex: 1;
-    display: flex;
-    overflow: hidden;
-    height: calc(100vh - 70px);
-}
-
-/* 좌측: 아바타 패널 */
-.avatarContainer {
-    width: 50%;
-    min-width: 50%;
-    max-width: 50%;
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
-    overflow: hidden;
-    height: 100%;
-    background: #0a0a0a;
-}
-
-.avatarPlaceholder {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #666;
-    background: linear-gradient(180deg, #1a1a2e 0%, #0a0a0a 100%);
-}
-
-/* 우측: 채팅 패널 */
-.chatContainer {
-    width: 50%;
-    max-width: 50%;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    padding: 1rem;
-    height: 100%;
-    background: #000;
-}
-
-.messages {
+/* 메시지 목록 */
+.messageList {
     flex: 1;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    padding-bottom: 1rem;
+    gap: 1rem;
+    padding: 1.5rem;
     scroll-behavior: smooth;
+}
+
+.loadingMsg {
+    text-align: center;
+    color: #666;
+    margin-top: 2rem;
 }
 
 .message {
@@ -151,21 +158,35 @@
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
-}
-
-.message.speaking {
-    border-color: rgba(255, 255, 255, 0.3);
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+    max-width: 80%;
 }
 
 .message.user {
+    align-self: flex-end;
     background: rgba(99, 102, 241, 0.1);
     border-color: rgba(99, 102, 241, 0.3);
-    margin-left: 15%;
 }
 
 .message.agent1 {
     border-left: 3px solid #3b82f6;
+}
+
+.message.agent2 {
+    border-left: 3px solid #f97316;
+}
+
+.message.agent3 {
+    border-left: 3px solid #a855f7;
+}
+
+.message.verifier {
+    border-left: 3px solid #ef4444;
+}
+
+.messageHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 0.5rem;
 }
 
@@ -204,8 +225,9 @@
 .inputContainer {
     display: flex;
     gap: 0.75rem;
-    padding-top: 1rem;
+    padding: 1.5rem;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
+    background: #000;
 }
 
 .input {
@@ -216,10 +238,6 @@
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
-}
-
-.input::placeholder {
-    color: #666;
 }
 
 .input:focus {
@@ -237,11 +255,16 @@
     transition: all 0.2s ease;
 }
 
-.sendBtn:hover {
+.sendBtn:hover:not(:disabled) {
     background: #4f46e5;
 }
 
-/* 모달 */
+.sendBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 모달 공통 */
 .modalOverlay {
     position: fixed;
     top: 0;
@@ -375,12 +398,6 @@
     animation: spin 1s linear infinite;
 }
 
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
 .reportText {
     white-space: pre-wrap;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -392,13 +409,13 @@
 
 /* 반응형 */
 @media (max-width: 900px) {
-    .contentWrapper {
+    .splitLayout {
         flex-direction: column;
         height: auto;
         overflow: visible;
     }
 
-    .avatarContainer {
+    .avatarSection {
         width: 100%;
         height: 300px;
         min-width: unset;
@@ -407,14 +424,9 @@
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
 
-    .chatContainer {
+    .chatSection {
         width: 100%;
-        max-width: 100%;
         height: 500px;
-    }
-
-    .reportModal {
-        width: 95%;
-        max-height: 90vh;
+        /* 모바일에서 고정 높이 */
     }
 }
