@@ -272,8 +272,15 @@ async def execute_round(session_id: str, current_round: int):
         await db.update_session(session_id, {"status": "finalized"})
         await sse_event_manager.emit(session_id, EventType.SESSION_END, {})
     else:
-        # WAIT_USER
+        # WAIT_USER → 자동으로 다음 라운드 진행 (사용자 입력 대기 없음)
         await sse_event_manager.emit(session_id, EventType.ROUND_END, {"round_index": current_round})
+        
+        # 다음 라운드가 있으면 자동 진행
+        next_round = current_round + 1
+        if next_round <= MAX_ROUNDS:
+            logger.info(f"[ExecuteRound] Auto-continuing to Round {next_round}")
+            await asyncio.sleep(1)  # 잠시 대기 (UI 업데이트용)
+            await execute_round(session_id, next_round)
 
 
 def extract_gate_status(response: str) -> Optional[str]:
