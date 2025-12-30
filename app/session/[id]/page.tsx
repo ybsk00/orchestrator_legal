@@ -1,3 +1,5 @@
+'use client'
+
 import { Suspense, useState } from 'react'
 import { useSessionEvents } from '@/lib/useSessionEvents'
 import GateSummaryCard from '@/components/gate/GateSummaryCard'
