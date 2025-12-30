@@ -288,8 +288,8 @@ async def list_sessions_endpoint(user_id: Optional[str] = Query(None)):
 
 
 class FinalReportResponse(BaseModel):
-    report_json: dict
-    report_md: str
+    report_json: Optional[dict] = None
+    report_md: Optional[str] = None
 
 
 @router.get("/sessions/{session_id}/report", response_model=FinalReportResponse)
