@@ -31,6 +31,9 @@ export default function SessionPage() {
     const [activeSpeaker, setActiveSpeaker] = useState<string | null>(null)
     const [showStopConfirm, setShowStopConfirm] = useState(false)
     const [stopTrigger, setStopTrigger] = useState('')
+    const [showReportModal, setShowReportModal] = useState(false)
+    const [reportContent, setReportContent] = useState<string | null>(null)
+    const [reportLoading, setReportLoading] = useState(false)
 
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -97,9 +100,17 @@ export default function SessionPage() {
     // 마무리 버튼
     const handleFinalize = async () => {
         try {
-            await fetch(`/api/sessions/${sessionId}/finalize`, {
+            const res = await fetch(`/api/sessions/${sessionId}/finalize`, {
                 method: 'POST',
             })
+            if (res.ok) {
+                // 세션 상태 갱신
+                const sessionRes = await fetch(`/api/sessions/${sessionId}`)
+                if (sessionRes.ok) {
+                    const data = await sessionRes.json()
+                    setSession(data)
+                }
+            }
         } catch (error) {
             console.error('Failed to finalize:', error)
         }
@@ -117,9 +128,34 @@ export default function SessionPage() {
         }
     }
 
-    // 리포트 페이지 열기 (새 창)
-    const handleViewReport = () => {
-        window.open(`/session/${sessionId}/report`, '_blank', 'width=900,height=800')
+    // 리포트 모달 열기
+    const handleViewReport = async () => {
+        setShowReportModal(true)
+        setReportLoading(true)
+
+        try {
+            // 먼저 리포트 조회 시도
+            let res = await fetch(`/api/sessions/${sessionId}/report`)
+
+            if (!res.ok) {
+                // 없으면 생성 요청
+                res = await fetch(`/api/sessions/${sessionId}/report/generate`, {
+                    method: 'POST'
+                })
+            }
+
+            if (res.ok) {
+                const data = await res.json()
+                setReportContent(data.report_md)
+            } else {
+                setReportContent('리포트를 불러오는데 실패했습니다.')
+            }
+        } catch (error) {
+            console.error('Failed to load report:', error)
+            setReportContent('오류가 발생했습니다.')
+        } finally {
+            setReportLoading(false)
+        }
     }
 
     const getAgentLabel = (role: string) => {
@@ -128,55 +164,52 @@ export default function SessionPage() {
             case 'agent2': return '🟠 Agent 2: 리스크'
             case 'agent3': return '🟣 Agent 3: 합의안'
             case 'verifier': return '🔴 Verifier: 검증관'
-            case 'user': return '👤 You'
-            default: return '⚙️ System'
+            case 'user': return '👤 사용자'
+            default: return role
         }
     }
 
     return (
-        <main className={styles.main}>
-            {/* 헤더 */}
-            <header className={styles.header}>
-                <div className={styles.sessionInfo}>
-                    <span className={styles.category}>{session?.category}</span>
-                    <h1 className={styles.topic}>{session?.topic}</h1>
-                </div>
-                <div className={styles.headerActions}>
-                    <span className={styles.roundBadge}>
-                        라운드 {session?.round_index || 0}/3
-                    </span>
-                    <span className={`${styles.connectionStatus} ${isConnected ? styles.connected : ''}`}>
-                        {isConnected ? '● 연결됨' : '○ 연결 중...'}
-                    </span>
-
-                    {session?.status === 'finalized' ? (
-                        <button className={styles.reportBtn} onClick={handleViewReport}>
-                            📑 최종 리포트 생성/보기
-                        </button>
-                    ) : (
-                        <button className={styles.finalizeBtn} onClick={handleFinalize}>
-                            마무리하기
-                        </button>
-                    )}
-                </div>
-            </header>
-
-            {/* 메인 컨텐츠: 아바타 패널 + 채팅 */}
-            <div className={styles.contentWrapper}>
-                {/* 좌측: 캐릭터 카드 패널 (50%) */}
-                <div className={styles.avatarContainer}>
-                    <Suspense fallback={<div className={styles.avatarPlaceholder}>캐릭터 로딩 중...</div>}>
+        <main className={styles.container}>
+            <div className={styles.splitLayout}>
+                {/* 좌측: 아바타 패널 */}
+                <div className={styles.avatarSection}>
+                    <Suspense fallback={<div className={styles.avatarPlaceholder}>로딩 중...</div>}>
                         <AvatarPanel activeSpeaker={activeSpeaker} />
                     </Suspense>
                 </div>
 
-                {/* 우측: 채팅 패널 (50%) */}
-                <div className={styles.chatContainer}>
-                    <div className={styles.messages}>
-                        {messages.map((msg) => (
+                {/* 우측: 채팅 영역 */}
+                <div className={styles.chatSection}>
+                    {/* 헤더 */}
+                    <div className={styles.chatHeader}>
+                        <div className={styles.headerInfo}>
+                            <span className={styles.categoryBadge}>{session?.category}</span>
+                            <h2>{session?.topic}</h2>
+                        </div>
+                        <div className={styles.headerActions}>
+                            <span className={styles.roundBadge}>
+                                라운드 {session?.round_index || 0}/3
+                            </span>
+                            <span className={`${styles.connectionStatus} ${isConnected ? styles.connected : ''}`}>
+                                {isConnected ? '● 연결됨' : '○ 연결 중...'}
+                            </span>
+                            <button className={styles.reportBtn} onClick={handleViewReport}>
+                                📑 최종 리포트 보기/생성하기
+                            </button>
+                            <button className={styles.finalizeBtn} onClick={handleFinalize}>
+                                🛑 마무리하기
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 메시지 목록 */}
+                    <div className={styles.messageList}>
+                        {isLoading && <div className={styles.loadingMsg}>메시지 로딩 중...</div>}
+                        {messages.map((msg, idx) => (
                             <div
-                                key={msg.id}
-                                className={`${styles.message} ${styles[msg.role]} ${activeSpeaker === msg.role ? styles.speaking : ''}`}
+                                key={msg.id || idx}
+                                className={`${styles.message} ${styles[msg.role] || ''}`}
                             >
                                 <div className={styles.messageHeader}>
                                     <span className={styles.roleLabel}>{getAgentLabel(msg.role)}</span>
@@ -228,6 +261,31 @@ export default function SessionPage() {
                             <button className={styles.primary} onClick={() => handleConfirmStop(true)}>
                                 마무리하기
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 리포트 모달 */}
+            {showReportModal && (
+                <div className={styles.modalOverlay} onClick={() => setShowReportModal(false)}>
+                    <div className={styles.reportModal} onClick={(e) => e.stopPropagation()}>
+                        <div className={styles.reportModalHeader}>
+                            <h2>📑 최종 합의 리포트</h2>
+                            <div className={styles.reportModalActions}>
+                                <button onClick={() => window.print()}>인쇄 / PDF 저장</button>
+                                <button onClick={() => setShowReportModal(false)}>닫기</button>
+                            </div>
+                        </div>
+                        <div className={styles.reportModalContent}>
+                            {reportLoading ? (
+                                <div className={styles.reportLoading}>
+                                    <div className={styles.spinner}></div>
+                                    <p>리포트 생성 중...</p>
+                                </div>
+                            ) : (
+                                <pre className={styles.reportText}>{reportContent}</pre>
+                            )}
                         </div>
                     </div>
                 </div>

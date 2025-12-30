@@ -478,6 +478,64 @@ async def session_events_endpoint(session_id: str):
     )
 
 
+@router.post("/sessions/{session_id}/finalize")
+async def finalize_session_endpoint(session_id: str):
+    """세션 마무리 - 즉시 종료하고 리포트 생성"""
+    try:
+        session = await db.get_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # 상태를 finalized로 변경
+        await db.update_session(session_id, {
+            "phase": Phase.FINALIZE_DONE.value,
+            "status": "finalized"
+        })
+        
+        # 리포트 자동 생성 시도
+        messages = await db.get_messages(session_id)
+        if messages:
+            conversation_text = ""
+            for msg in messages:
+                role = msg.get("role", "unknown")
+                content = msg.get("content_text", "")
+                conversation_text += f"{role}: {content}\n\n"
+            
+            prompt = f"""
+            다음은 AI 에이전트들이 나눈 토론 내용입니다.
+            이 내용을 바탕으로 최종 결론 보고서를 작성해주세요.
+            
+            [토론 내용]
+            {conversation_text}
+            
+            [작성 양식]
+            1. **종합 결론**: 토론의 핵심 결과 요약
+            2. **실행 방안**: 구체적인 실행 단계 및 계획
+            3. **구현 방향**: 기술적/실무적 구현 가이드
+            
+            분량은 공백 포함 1500자 내외로 상세하게 작성해주세요.
+            """
+            
+            try:
+                response = await gemini_client.generate_content(prompt)
+                report_content = response.text
+                report_json = {"content": report_content}
+                await db.save_final_report(session_id, report_json, report_content)
+            except Exception as e:
+                logger.error(f"Failed to generate report on finalize: {e}")
+        
+        # SSE 이벤트 발송
+        await sse_event_manager.emit(session_id, EventType.SESSION_END, {})
+        
+        return {"status": "finalized", "session_id": session_id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Finalize] 오류 발생: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 class FinalReportResponse(BaseModel):
     report_json: Optional[dict] = None
     report_md: Optional[str] = None
