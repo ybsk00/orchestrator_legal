@@ -1,6 +1,6 @@
 .main {
     min-height: 100vh;
-    background: linear-gradient(135deg, #0a0a0f 0%, #0d0d1a 50%, #0a0a0f 100%);
+    background: transparent;
     color: #fff;
     position: relative;
     overflow-x: hidden;
@@ -14,6 +14,7 @@
     height: 100%;
     z-index: 0;
     pointer-events: none;
+    background: linear-gradient(135deg, #050510 0%, #0a0a1a 50%, #050510 100%);
 }
 
 .content {
@@ -21,42 +22,80 @@
     z-index: 1;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 2rem;
+    padding: 1rem 2rem;
 }
 
-/* Hero Section */
+/* Hero Section with Video */
 .hero {
-    text-align: center;
-    padding: 6rem 0 4rem;
-    min-height: 70vh;
+    position: relative;
+    min-height: 85vh;
     display: flex;
-    flex-direction: column;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
+    margin-bottom: 2rem;
+    border-radius: 24px;
+    overflow: hidden;
+}
+
+.heroVideo {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+}
+
+.video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.videoOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg,
+            rgba(5, 5, 16, 0.2) 0%,
+            rgba(5, 5, 16, 0.3) 50%,
+            rgba(5, 5, 16, 0.5) 100%);
+    pointer-events: none;
+}
+
+.heroContent {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    padding: 3rem;
 }
 
 .badge {
     display: inline-block;
-    padding: 0.5rem 1rem;
-    background: rgba(99, 102, 241, 0.15);
-    border: 1px solid rgba(99, 102, 241, 0.3);
+    padding: 0.5rem 1.25rem;
+    background: rgba(99, 102, 241, 0.2);
+    border: 1px solid rgba(99, 102, 241, 0.4);
     border-radius: 50px;
     font-size: 0.85rem;
-    color: #818cf8;
+    color: #a5b4fc;
     margin-bottom: 1.5rem;
+    backdrop-filter: blur(10px);
     animation: fadeInUp 0.6s ease-out;
 }
 
 .title {
-    font-size: clamp(2.5rem, 6vw, 4rem);
+    font-size: clamp(2.5rem, 7vw, 4.5rem);
     font-weight: 800;
-    line-height: 1.2;
+    line-height: 1.1;
     margin-bottom: 1.5rem;
+    text-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
     animation: fadeInUp 0.6s ease-out 0.1s both;
 }
 
 .gradient {
-    background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+    background: linear-gradient(135deg, #818cf8 0%, #c084fc 50%, #f472b6 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -64,10 +103,11 @@
 
 .subtitle {
     font-size: 1.15rem;
-    color: #a0a0b0;
+    color: rgba(255, 255, 255, 0.85);
     max-width: 600px;
+    margin: 0 auto 2rem;
     line-height: 1.8;
-    margin-bottom: 2.5rem;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
     animation: fadeInUp 0.6s ease-out 0.2s both;
 }
 
@@ -80,178 +120,245 @@
 }
 
 .primaryButton {
-    padding: 1rem 2rem;
+    padding: 1rem 2.5rem;
     background: linear-gradient(135deg, #6366f1, #8b5cf6);
     color: #fff;
-    border-radius: 12px;
+    border-radius: 14px;
     font-weight: 600;
-    font-size: 1rem;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+    font-size: 1.05rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 25px rgba(99, 102, 241, 0.4);
 }
 
 .primaryButton:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4);
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 12px 40px rgba(99, 102, 241, 0.5);
 }
 
 .secondaryButton {
-    padding: 1rem 2rem;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1rem 2.5rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     color: #fff;
-    border-radius: 12px;
+    border-radius: 14px;
     font-weight: 500;
-    font-size: 1rem;
-    transition: all 0.3s ease;
-    backdrop-filter: blur(10px);
+    font-size: 1.05rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(15px);
 }
 
 .secondaryButton:hover {
-    background: rgba(255, 255, 255, 0.1);
-    transform: translateY(-3px);
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-4px);
+    border-color: rgba(255, 255, 255, 0.3);
 }
 
 /* Section Styles */
 .sectionTitle {
-    font-size: 1.75rem;
+    font-size: 2rem;
     font-weight: 700;
     text-align: center;
-    margin-bottom: 2.5rem;
+    margin-bottom: 2rem;
     color: #fff;
+    text-shadow: 0 2px 20px rgba(99, 102, 241, 0.3);
 }
 
 /* Features Section */
 .features {
-    padding: 4rem 0;
+    padding: 2rem 0;
 }
 
 .featureGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
 }
 
 .featureCard {
+    position: relative;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px;
-    padding: 2rem;
+    border-radius: 20px;
+    padding: 1.75rem;
     backdrop-filter: blur(20px);
-    transition: all 0.3s ease;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     text-align: center;
+    overflow: hidden;
+}
+
+.featureCard::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+            rgba(99, 102, 241, 0.15) 0%,
+            transparent 50%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+}
+
+.featureCard:hover::before {
+    opacity: 1;
 }
 
 .featureCard:hover {
     background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(99, 102, 241, 0.3);
-    transform: translateY(-5px);
-    box-shadow: 0 10px 40px rgba(99, 102, 241, 0.1);
+    border-color: rgba(99, 102, 241, 0.4);
+    transform: translateY(-8px) scale(1.02);
+    box-shadow:
+        0 20px 50px rgba(99, 102, 241, 0.15),
+        0 0 0 1px rgba(99, 102, 241, 0.2);
+}
+
+.cardGlow {
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle,
+            rgba(99, 102, 241, 0.1) 0%,
+            transparent 40%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+}
+
+.featureCard:hover .cardGlow {
+    opacity: 1;
 }
 
 .featureIcon {
     font-size: 2.5rem;
     display: block;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
+    filter: drop-shadow(0 4px 10px rgba(99, 102, 241, 0.3));
 }
 
 .featureCard h3 {
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 600;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
     color: #fff;
 }
 
 .featureCard p {
-    font-size: 0.9rem;
-    color: #888;
-    line-height: 1.6;
+    font-size: 0.85rem;
+    color: #a0a0b0;
+    line-height: 1.5;
 }
 
 /* Agents Section */
 .agents {
-    padding: 4rem 0;
+    padding: 2rem 0;
 }
 
 .agentGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
 }
 
 .agentCard {
+    position: relative;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px;
-    padding: 2rem;
+    border-radius: 20px;
+    padding: 1.5rem;
     backdrop-filter: blur(20px);
     text-align: center;
-    transition: all 0.3s ease;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
 }
 
 .agentCard:hover {
     background: rgba(255, 255, 255, 0.06);
-    transform: translateY(-5px) scale(1.02);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+}
+
+.agentCard:hover .cardGlow {
+    opacity: 1;
 }
 
 .agentAvatar {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
+    width: 70px;
+    height: 70px;
+    border-radius: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #fff;
+    font-size: 1.75rem;
     margin: 0 auto 1rem;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+}
+
+.agentCard:hover .agentAvatar {
+    transform: scale(1.1) rotate(5deg);
 }
 
 .agentName {
     display: block;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 600;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.35rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .agentRole {
     display: block;
     font-size: 1rem;
     color: #fff;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
 }
 
 .agentDesc {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: #888;
-    line-height: 1.5;
+    line-height: 1.4;
 }
 
 /* CTA Section */
 .cta {
-    padding: 4rem 0;
+    padding: 2rem 0;
 }
 
 .ctaCard {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
-    border: 1px solid rgba(99, 102, 241, 0.2);
-    border-radius: 24px;
-    padding: 3rem;
+    position: relative;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(139, 92, 246, 0.12) 100%);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    border-radius: 28px;
+    padding: 2.5rem;
     text-align: center;
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(25px);
+    overflow: hidden;
+    transition: all 0.4s ease;
+}
+
+.ctaCard:hover {
+    border-color: rgba(99, 102, 241, 0.4);
+    box-shadow: 0 20px 60px rgba(99, 102, 241, 0.2);
+}
+
+.ctaCard:hover .cardGlow {
+    opacity: 1;
 }
 
 .ctaCard h2 {
     font-size: 1.75rem;
     font-weight: 700;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
 }
 
 .ctaCard p {
     color: #a0a0b0;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
 }
 
 .ctaButton {
@@ -259,36 +366,36 @@
     padding: 1rem 2.5rem;
     background: linear-gradient(135deg, #6366f1, #a855f7);
     color: #fff;
-    border-radius: 12px;
+    border-radius: 14px;
     font-weight: 600;
     font-size: 1rem;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 25px rgba(99, 102, 241, 0.4);
 }
 
 .ctaButton:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4);
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 12px 40px rgba(99, 102, 241, 0.5);
 }
 
 /* Footer */
 .footer {
-    padding: 3rem 0;
+    padding: 2rem 0;
     text-align: center;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
-    margin-top: 2rem;
+    margin-top: 1rem;
 }
 
 .footer p {
-    color: #666;
-    font-size: 0.9rem;
+    color: #555;
+    font-size: 0.85rem;
 }
 
 /* Animations */
 @keyframes fadeInUp {
     from {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateY(30px);
     }
 
     to {
@@ -298,10 +405,21 @@
 }
 
 /* Responsive */
+@media (max-width: 1024px) {
+
+    .featureGrid,
+    .agentGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 @media (max-width: 768px) {
     .hero {
-        padding: 4rem 0 3rem;
-        min-height: auto;
+        min-height: 70vh;
+    }
+
+    .heroContent {
+        padding: 2rem 1rem;
     }
 
     .title {
@@ -309,7 +427,7 @@
     }
 
     .subtitle {
-        font-size: 1rem;
+        font-size: 0.95rem;
     }
 
     .heroButtons {
@@ -329,6 +447,6 @@
     }
 
     .ctaCard {
-        padding: 2rem;
+        padding: 1.5rem;
     }
 }
