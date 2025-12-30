@@ -698,12 +698,11 @@ async def finalize_session_endpoint(session_id: str):
             2. **실행 방안**: 구체적인 실행 단계 및 계획
             3. **구현 방향**: 기술적/실무적 구현 가이드
             
-            분량은 공백 포함 1500자 내외로 상세하게 작성해주세요.
+            분량은 공백 포함 2000자 정도로 구체적이고 상세하게 서술해주세요.
             """
             
             try:
-                response = await gemini_client.generate_content(prompt)
-                report_content = response.text
+                report_content = await gemini_client.generate_text(prompt)
                 report_json = {"content": report_content}
                 await db.save_final_report(session_id, report_json, report_content)
             except Exception as e:
@@ -766,13 +765,12 @@ async def generate_report(session_id: str):
     2. **실행 방안**: 구체적인 실행 단계 및 계획
     3. **구현 방향**: 기술적/실무적 구현 가이드
     
-    분량은 공백 포함 1500자 내외로 상세하게 작성해주세요.
+    분량은 공백 포함 2000자 정도로 구체적이고 상세하게 서술해주세요.
     """
 
     # Gemini 호출
     try:
-        response = await gemini_client.generate_content(prompt)
-        report_content = response.text
+        report_content = await gemini_client.generate_text(prompt)
     except Exception as e:
         logger.error(f"Failed to generate report: {e}")
         raise HTTPException(status_code=500, detail=f"Report generation failed: {str(e)}")

@@ -158,6 +158,38 @@ class GeminiClient:
             return json.loads(response.text)
         except Exception as e:
             return {"error": str(e)}
+    
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=2, min=5, max=60)
+    )
+    async def generate_text(self, prompt: str) -> str:
+        """
+        비스트리밍 텍스트 응답 생성 (리포트 등 단일 요청용)
+        
+        Args:
+            prompt: 프롬프트 텍스트
+            
+        Returns:
+            생성된 텍스트 응답
+        """
+        if not self.client:
+            return "[Gemini API 클라이언트가 초기화되지 않았습니다]"
+        
+        try:
+            logger.info(f"[GeminiClient] generate_text 요청 시작 - model={GEMINI_MODEL}")
+            
+            response = self.client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=prompt
+            )
+            
+            logger.info(f"[GeminiClient] generate_text 완료")
+            return response.text
+            
+        except Exception as e:
+            logger.error(f"[GeminiClient] generate_text 오류: {e}")
+            return f"[오류 발생: {str(e)}]"
 
 
 class BaseAgent(ABC):

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, Suspense } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useRealtimeMessages, Message } from '@/lib/useRealtimeMessages'
 import { useSessionEvents } from '@/lib/useSessionEvents'
@@ -28,6 +28,7 @@ interface SessionData {
 
 export default function SessionPage() {
     const params = useParams()
+    const router = useRouter()
     const sessionId = params.id as string
 
     const [session, setSession] = useState<SessionData | null>(null)
@@ -111,12 +112,8 @@ export default function SessionPage() {
                 method: 'POST',
             })
             if (res.ok) {
-                // 세션 상태 갱신
-                const sessionRes = await fetch(`/api/sessions/${sessionId}`)
-                if (sessionRes.ok) {
-                    const data = await sessionRes.json()
-                    setSession(data)
-                }
+                // 대시보드로 이동
+                router.push('/')
             }
         } catch (error) {
             console.error('Failed to finalize:', error)
@@ -168,7 +165,7 @@ export default function SessionPage() {
     // Steering 핸들러
     const handleSteeringAction = async (action: string, steeringData: any = null) => {
         try {
-            await fetch(`/api/sessions/${sessionId}/steering`, {
+            const res = await fetch(`/api/sessions/${sessionId}/steering`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -177,6 +174,11 @@ export default function SessionPage() {
                     request_id: crypto.randomUUID()
                 })
             })
+
+            // finalize 또는 new_session 액션일 경우 대시보드로 이동
+            if (res.ok && (action === 'finalize' || action === 'new_session')) {
+                router.push('/')
+            }
         } catch (error) {
             console.error('Steering action failed:', error)
             alert('요청 처리 중 오류가 발생했습니다.')
