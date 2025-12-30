@@ -87,103 +87,13 @@
 .newSessionBtn {
     background: #00C851;
     color: #fff;
+}
 
-    .card {
-        background: rgba(40, 20, 20, 0.95);
-        border: 1px solid rgba(255, 100, 100, 0.2);
-        border-radius: 12px;
-        padding: 2rem;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(10px);
-        text-align: center;
-    }
+.newSessionBtn:hover {
+    background: #007E33;
+}
 
-    .card h3 {
-        font-size: 1.5rem;
-        color: #ff4444;
-        margin-bottom: 0.5rem;
-    }
-
-    .description {
-        color: #ccc;
-        margin-bottom: 2rem;
-    }
-
-    .actions {
-        display: flex;
-        justify-content: space-around;
-        align-items: stretch;
-        gap: 1rem;
-    }
-
-    .actionGroup {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 1rem;
-        background: rgba(0, 0, 0, 0.2);
-        border-radius: 8px;
-    }
-
-    .actionGroup h4 {
-        margin: 0 0 0.5rem 0;
-        color: #fff;
-    }
-
-    .actionGroup p {
-        font-size: 0.9rem;
-        color: #aaa;
-        margin-bottom: 1rem;
-        flex: 1;
-    }
-
-    .divider {
-        width: 1px;
-        background: rgba(255, 255, 255, 0.1);
-    }
-
-    .finalizeBtn,
-    .extendBtn,
-    .newSessionBtn {
-        width: 100%;
-        padding: 0.8rem;
-        border: none;
-        border-radius: 6px;
-        font-weight: bold;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .finalizeBtn {
-        background: #ff4444;
-        color: #fff;
-    }
-
-    .finalizeBtn:hover {
-        background: #CC0000;
-    }
-
-    .extendBtn {
-        background: #ffbb33;
-        color: #000;
-    }
-
-    .extendBtn:hover {
-        background: #FF8800;
-    }
-
-    .newSessionBtn {
-        background: #00C851;
-        color: #fff;
-    }
-
-    .newSessionBtn:hover {
-        background: #007E33;
-    }
-
-    .card button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
+.card button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
