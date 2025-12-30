@@ -250,38 +250,39 @@ export default function SessionPage() {
                             </div>
                         ))}
 
-                        {/* USER_GATE / END_GATE UI 렌더링 */}
-                        {(session?.phase === 'USER_GATE' || session?.phase === 'END_GATE') && (
-                            <div className={styles.gateContainer}>
-                                {/* GateSummaryCard는 gateData가 있을 때만 표시 */}
-                                {gateData && (
-                                    <GateSummaryCard
-                                        roundIndex={gateData.round_index}
-                                        decisionSummary={gateData.decision_summary}
-                                        openIssues={gateData.open_issues}
-                                        verifierStatus={gateData.verifier_gate_status}
-                                    />
-                                )}
+                        {/* USER_GATE / END_GATE UI 렌더링 - 마지막 메시지 스트리밍 완료 후 표시 */}
+                        {(session?.phase === 'USER_GATE' || session?.phase === 'END_GATE') &&
+                            !messages.some(m => m.isStreaming) && (
+                                <div className={styles.gateContainer}>
+                                    {/* GateSummaryCard는 gateData가 있을 때만 표시 */}
+                                    {gateData && (
+                                        <GateSummaryCard
+                                            roundIndex={gateData.round_index}
+                                            decisionSummary={gateData.decision_summary}
+                                            openIssues={gateData.open_issues}
+                                            verifierStatus={gateData.verifier_gate_status}
+                                        />
+                                    )}
 
-                                {session.phase === 'USER_GATE' && (
-                                    <SteeringPanel
-                                        sessionId={sessionId}
-                                        onSkip={() => handleSteeringAction('skip')}
-                                        onInput={(data) => handleSteeringAction('input', data)}
-                                        onFinalize={() => handleSteeringAction('finalize')}
-                                    />
-                                )}
+                                    {session.phase === 'USER_GATE' && (
+                                        <SteeringPanel
+                                            sessionId={sessionId}
+                                            onSkip={() => handleSteeringAction('skip')}
+                                            onInput={(data) => handleSteeringAction('input', data)}
+                                            onFinalize={() => handleSteeringAction('finalize')}
+                                        />
+                                    )}
 
-                                {session.phase === 'END_GATE' && (
-                                    <EndGateCard
-                                        sessionId={sessionId}
-                                        onFinalize={() => handleSteeringAction('finalize')}
-                                        onExtend={() => handleSteeringAction('extend')}
-                                        onNewSession={() => handleSteeringAction('new_session')}
-                                    />
-                                )}
-                            </div>
-                        )}
+                                    {session.phase === 'END_GATE' && (
+                                        <EndGateCard
+                                            sessionId={sessionId}
+                                            onFinalize={() => handleSteeringAction('finalize')}
+                                            onExtend={() => handleSteeringAction('extend')}
+                                            onNewSession={() => handleSteeringAction('new_session')}
+                                        />
+                                    )}
+                                </div>
+                            )}
 
                         <div ref={messagesEndRef} />
                     </div>
