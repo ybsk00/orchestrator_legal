@@ -51,6 +51,7 @@ agents = {
 class CreateSessionRequest(BaseModel):
     category: str
     topic: str
+    user_id: Optional[str] = None
 
 
 class CreateSessionResponse(BaseModel):
@@ -301,7 +302,7 @@ async def create_session_endpoint(request: CreateSessionRequest, background_task
     try:
         # Supabase에 세션 생성
         session_data = await db.create_session(
-            user_id=None,
+            user_id=request.user_id,
             category=request.category,
             topic=request.topic
         )
