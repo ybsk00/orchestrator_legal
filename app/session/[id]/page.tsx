@@ -251,14 +251,17 @@ export default function SessionPage() {
                         ))}
 
                         {/* USER_GATE / END_GATE UI 렌더링 */}
-                        {(session?.phase === 'USER_GATE' || session?.phase === 'END_GATE') && gateData && (
+                        {(session?.phase === 'USER_GATE' || session?.phase === 'END_GATE') && (
                             <div className={styles.gateContainer}>
-                                <GateSummaryCard
-                                    roundIndex={gateData.round_index}
-                                    decisionSummary={gateData.decision_summary}
-                                    openIssues={gateData.open_issues}
-                                    verifierStatus={gateData.verifier_gate_status}
-                                />
+                                {/* GateSummaryCard는 gateData가 있을 때만 표시 */}
+                                {gateData && (
+                                    <GateSummaryCard
+                                        roundIndex={gateData.round_index}
+                                        decisionSummary={gateData.decision_summary}
+                                        openIssues={gateData.open_issues}
+                                        verifierStatus={gateData.verifier_gate_status}
+                                    />
+                                )}
 
                                 {session.phase === 'USER_GATE' && (
                                     <SteeringPanel
