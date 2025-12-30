@@ -1,4 +1,4 @@
-import { Suspense } from 'react'
+import { Suspense, useState } from 'react'
 import { useSessionEvents } from '@/lib/useSessionEvents'
 import GateSummaryCard from '@/components/gate/GateSummaryCard'
 import SteeringPanel from '@/components/gate/SteeringPanel'
@@ -10,6 +10,7 @@ import styles from './page.module.css'
 
 export default function SessionPage({ params }: { params: { id: string } }) {
     const sessionId = params.id
+    const [activeSpeaker, setActiveSpeaker] = useState<string | null>(null)
 
     // SSE 이벤트 훅 사용
     const { gateData } = useSessionEvents(sessionId)
