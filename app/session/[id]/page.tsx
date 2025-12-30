@@ -4,7 +4,11 @@ import { useEffect, useState, useRef, Suspense } from 'react'
 import { useParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useRealtimeMessages, Message } from '@/lib/useRealtimeMessages'
+import { useSessionEvents } from '@/lib/useSessionEvents'
 import TypingMessage from '@/components/TypingMessage'
+import GateSummaryCard from '@/components/gate/GateSummaryCard'
+import SteeringPanel from '@/components/gate/SteeringPanel'
+import EndGateCard from '@/components/gate/EndGateCard'
 import styles from './page.module.css'
 
 // Avatar Panel은 클라이언트 사이드에서만 로드
@@ -39,6 +43,9 @@ export default function SessionPage() {
 
     // Supabase Realtime 훅 사용
     const { messages, isLoading, isConnected } = useRealtimeMessages(sessionId)
+
+    // SSE 이벤트 훅 사용 (Gate 데이터)
+    const { gateData } = useSessionEvents(sessionId)
 
     // 세션 정보 로드
     useEffect(() => {
@@ -158,6 +165,24 @@ export default function SessionPage() {
         }
     }
 
+    // Steering 핸들러
+    const handleSteeringAction = async (action: string, steeringData: any = null) => {
+        try {
+            await fetch(`/api/sessions/${sessionId}/steering`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action,
+                    steering: steeringData,
+                    request_id: crypto.randomUUID()
+                })
+            })
+        } catch (error) {
+            console.error('Steering action failed:', error)
+            alert('요청 처리 중 오류가 발생했습니다.')
+        }
+    }
+
     const getAgentLabel = (role: string) => {
         switch (role) {
             case 'agent1': return '🔵 Agent 1: 구현계획'
@@ -224,6 +249,37 @@ export default function SessionPage() {
                                 </div>
                             </div>
                         ))}
+
+                        {/* USER_GATE / END_GATE UI 렌더링 */}
+                        {(session?.phase === 'USER_GATE' || session?.phase === 'END_GATE') && gateData && (
+                            <div className={styles.gateContainer}>
+                                <GateSummaryCard
+                                    roundIndex={gateData.round_index}
+                                    decisionSummary={gateData.decision_summary}
+                                    openIssues={gateData.open_issues}
+                                    verifierStatus={gateData.verifier_gate_status}
+                                />
+
+                                {session.phase === 'USER_GATE' && (
+                                    <SteeringPanel
+                                        sessionId={sessionId}
+                                        onSkip={() => handleSteeringAction('skip')}
+                                        onInput={(data) => handleSteeringAction('input', data)}
+                                        onFinalize={() => handleSteeringAction('finalize')}
+                                    />
+                                )}
+
+                                {session.phase === 'END_GATE' && (
+                                    <EndGateCard
+                                        sessionId={sessionId}
+                                        onFinalize={() => handleSteeringAction('finalize')}
+                                        onExtend={() => handleSteeringAction('extend')}
+                                        onNewSession={() => handleSteeringAction('new_session')}
+                                    />
+                                )}
+                            </div>
+                        )}
+
                         <div ref={messagesEndRef} />
                     </div>
 
@@ -232,16 +288,20 @@ export default function SessionPage() {
                         <input
                             type="text"
                             className={styles.input}
-                            placeholder="메시지를 입력하세요... (/stop 또는 /마무리로 종료)"
+                            placeholder={
+                                session?.phase === 'USER_GATE' || session?.phase === 'END_GATE'
+                                    ? "위의 버튼을 사용하여 진행해주세요."
+                                    : "메시지를 입력하세요... (/stop 또는 /마무리로 종료)"
+                            }
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                            disabled={session?.status === 'finalized'}
+                            disabled={session?.status === 'finalized' || session?.phase === 'USER_GATE' || session?.phase === 'END_GATE'}
                         />
                         <button
                             className={styles.sendBtn}
                             onClick={handleSend}
-                            disabled={session?.status === 'finalized'}
+                            disabled={session?.status === 'finalized' || session?.phase === 'USER_GATE' || session?.phase === 'END_GATE'}
                         >
                             전송
                         </button>
