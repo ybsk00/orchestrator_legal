@@ -66,6 +66,7 @@ class TurnManager:
     def get_total_turns(self) -> int:
         return len(self.turns)
 
+    def get_round_index(self, turn_index: int) -> int:
         """
         턴 인덱스를 기반으로 현재 라운드(1, 2, 3)를 반환합니다.
         각 라운드는 4개의 턴으로 구성됩니다 (Agent1, Agent2, Agent3, Verifier).
@@ -73,3 +74,4 @@ class TurnManager:
         return (turn_index // 4) + 1
 
 turn_manager = TurnManager()
+

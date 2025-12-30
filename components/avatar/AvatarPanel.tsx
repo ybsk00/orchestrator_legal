@@ -15,7 +15,7 @@ interface AgentCardProps {
     name: string
     role: string
     isSpeaking: boolean
-    colorTheme: 'blue' | 'orange' | 'purple'
+    colorTheme: 'blue' | 'orange' | 'purple' | 'red'
 }
 
 function AgentCard({ agentId, name, role, isSpeaking, colorTheme }: AgentCardProps) {
@@ -121,10 +121,11 @@ export default function AvatarPanel({ activeSpeaker }: AvatarPanelProps) {
         { id: 'agent1', name: 'Agent 1', role: 'Planner', colorTheme: 'blue' as const },
         { id: 'agent2', name: 'Agent 2', role: 'Critic', colorTheme: 'orange' as const },
         { id: 'agent3', name: 'Agent 3', role: 'Synthesizer', colorTheme: 'purple' as const },
+        { id: 'verifier', name: 'Verifier', role: 'Verifier', colorTheme: 'red' as const },
     ]
 
     const topAgents = agents.filter(a => ['agent1', 'agent2'].includes(a.id))
-    const bottomAgents = agents.filter(a => a.id === 'agent3')
+    const bottomAgents = agents.filter(a => ['agent3', 'verifier'].includes(a.id))
 
     return (
         <div className={styles.avatarPanel}>
