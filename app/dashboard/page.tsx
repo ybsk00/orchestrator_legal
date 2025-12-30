@@ -31,6 +31,8 @@ interface Session {
     created_at: string
 }
 
+const ITEMS_PER_PAGE = 10
+
 export default function DashboardPage() {
     const [sessions, setSessions] = useState<Session[]>([])
     const [category, setCategory] = useState<Category>('')
@@ -42,6 +44,7 @@ export default function DashboardPage() {
     const [filterDate, setFilterDate] = useState('all')
     const [searchQuery, setSearchQuery] = useState('')
     const [activeTab, setActiveTab] = useState<'new' | 'history'>('history')
+    const [currentPage, setCurrentPage] = useState(1)
     const router = useRouter()
     const supabase = createClient()
 
@@ -107,6 +110,18 @@ export default function DashboardPage() {
 
         return result
     }, [sessions, filterCategory, filterDate, searchQuery])
+
+    // 페이지네이션 계산
+    const totalPages = Math.ceil(filteredSessions.length / ITEMS_PER_PAGE)
+    const paginatedSessions = useMemo(() => {
+        const start = (currentPage - 1) * ITEMS_PER_PAGE
+        return filteredSessions.slice(start, start + ITEMS_PER_PAGE)
+    }, [filteredSessions, currentPage])
+
+    // 필터 변경시 1페이지로 리셋
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [filterCategory, filterDate, searchQuery])
 
     const handleStartSession = async () => {
         if (!category || !topic.trim()) return
@@ -276,9 +291,22 @@ export default function DashboardPage() {
                             {/* Session List */}
                             <div className={styles.sessionListHeader}>
                                 <span>총 {filteredSessions.length}개의 회의</span>
+                                <span className={styles.pageInfo}>
+                                    {totalPages > 0 ? `${currentPage} / ${totalPages} 페이지` : ''}
+                                </span>
                             </div>
-                            <div className={styles.sessionGrid}>
-                                {filteredSessions.length === 0 ? (
+
+                            {/* 리스트 형태 테이블 */}
+                            <div className={styles.sessionTable}>
+                                <div className={styles.tableHeader}>
+                                    <div className={styles.colCategory}>카테고리</div>
+                                    <div className={styles.colTopic}>주제</div>
+                                    <div className={styles.colStatus}>상태</div>
+                                    <div className={styles.colDate}>생성일</div>
+                                    <div className={styles.colActions}>액션</div>
+                                </div>
+
+                                {paginatedSessions.length === 0 ? (
                                     <div className={styles.emptyState}>
                                         <span className={styles.emptyIcon}>📭</span>
                                         <h3>회의가 없습니다</h3>
@@ -291,20 +319,26 @@ export default function DashboardPage() {
                                         </button>
                                     </div>
                                 ) : (
-                                    filteredSessions.map(session => (
-                                        <div key={session.id} className={styles.sessionCard}>
-                                            <div className={styles.sessionCardHeader}>
-                                                <span className={styles.sessionCategory}>
+                                    paginatedSessions.map(session => (
+                                        <div key={session.id} className={styles.tableRow}>
+                                            <div className={styles.colCategory}>
+                                                <span className={styles.categoryBadge}>
                                                     {CATEGORIES.find(c => c.value === session.category)?.icon || '📋'}
                                                     {CATEGORIES.find(c => c.value === session.category)?.label || session.category}
                                                 </span>
-                                                <span className={`${styles.sessionStatus} ${session.status === 'finalized' ? styles.completed : styles.active}`}>
+                                            </div>
+                                            <div className={styles.colTopic}>
+                                                <span className={styles.topicText}>{session.topic}</span>
+                                            </div>
+                                            <div className={styles.colStatus}>
+                                                <span className={`${styles.statusBadge} ${session.status === 'finalized' ? styles.completed : styles.active}`}>
                                                     {session.status === 'finalized' ? '완료' : '진행중'}
                                                 </span>
                                             </div>
-                                            <h3 className={styles.sessionTopic}>{session.topic}</h3>
-                                            <p className={styles.sessionDate}>{formatDate(session.created_at)}</p>
-                                            <div className={styles.sessionActions}>
+                                            <div className={styles.colDate}>
+                                                {formatDate(session.created_at)}
+                                            </div>
+                                            <div className={styles.colActions}>
                                                 <button
                                                     className={styles.viewBtn}
                                                     onClick={() => router.push(`/session/${session.id}`)}
@@ -324,6 +358,37 @@ export default function DashboardPage() {
                                     ))
                                 )}
                             </div>
+
+                            {/* 페이지네이션 */}
+                            {totalPages > 1 && (
+                                <div className={styles.pagination}>
+                                    <button
+                                        className={styles.pageBtn}
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                        disabled={currentPage === 1}
+                                    >
+                                        &lt; 이전
+                                    </button>
+
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                                        <button
+                                            key={page}
+                                            className={`${styles.pageBtn} ${currentPage === page ? styles.activePage : ''}`}
+                                            onClick={() => setCurrentPage(page)}
+                                        >
+                                            {page}
+                                        </button>
+                                    ))}
+
+                                    <button
+                                        className={styles.pageBtn}
+                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                        disabled={currentPage === totalPages}
+                                    >
+                                        다음 &gt;
+                                    </button>
+                                </div>
+                            )}
                         </>
                     ) : (
                         /* New Session Form */
