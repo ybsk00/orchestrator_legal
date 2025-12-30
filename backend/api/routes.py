@@ -1,14 +1,25 @@
 import asyncio
+import logging
+import uuid
+import httpx
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Request
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+from typing import Dict, List, Optional, Any
+
+from models.session import Session, SessionStatus, Category, Phase
+from models.case_file import CaseFile
+from orchestrator.state_machine import state_machine
+from orchestrator.turn_manager import turn_manager, AgentRole, TurnType
 from orchestrator.stop_detector import stop_detector, StopConfidence
 from agents.base_agent import gemini_client
 from agents.agent1_planner import Agent1Planner
-from agents.agent2_critic import Agent2Critic
 from agents.agent2_critic import Agent2Critic
 from agents.agent3_synthesizer import Agent3Synthesizer
 from agents.verifier import VerifierAgent
 from storage import supabase_client as db
 from .events import sse_event_manager, EventType
-from config import BASE_URL  # config.py에 BASE_URL 추가 필요
+from config import BASE_URL
 
 # 로깅 설정
 logging.basicConfig(level=logging.DEBUG)
