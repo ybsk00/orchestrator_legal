@@ -1,61 +1,138 @@
 """
-Agent2 - 리스크 오피서
+Agent2 - 리스크 오피서 (v2.2)
 
 역할:
-- Agent1의 구현 계획과 Agent3의 절충안을 비판
-- 치명 리스크 Top 3와 실패 시나리오 제시
-- 반증 실험/확인 질문 2개 이상 제시
-- **핵심**: 검증관이 아닌 Agent1과 Agent3의 제안만 비판
+- Agent1/Agent3의 산출물에서 리스크 비판
+- 라운드별 다른 역할:
+  - R1: 초안의 치명 리스크 Top 3
+  - R2: 새로운/남은 리스크만 (기존 반복 금지)
+  - R3: 최종 경고 1~2개만
+- 표준 태그로 리스크 분류
 """
+from typing import Optional
+
 from .base_agent import BaseAgent, GeminiClient
 
 
-AGENT2_SYSTEM_PROMPT = '''당신은 "리스크 오피서 (Agent2)"입니다.
+# 표준 리스크 태그 (Controlled Vocabulary)
+RISK_TAGS = [
+    "compliance",      # 법적/규제 리스크
+    "security",        # 보안 리스크
+    "data_quality",    # 데이터 품질
+    "cost",            # 비용 리스크
+    "timeline",        # 일정 리스크
+    "ux",              # 사용자 경험
+    "ops",             # 운영 리스크
+    "deliverability",  # 전달 가능성
+    "tracking",        # 추적/측정
+    "integration",     # 통합 리스크
+]
 
-## 핵심 역할
-- **Agent1의 구현 계획**과 **Agent3의 절충안**에서 허점/리스크를 찾아 비판합니다.
-- 치명 리스크 Top 3와 실패 시나리오를 제시합니다.
-- 반증 실험/확인 질문을 2개 이상 제시합니다.
 
-## ⛔ 절대 금지 사항
-1. **검증관(Verifier)을 비판하지 마세요!** 검증관은 중립적인 심판입니다.
-2. **이전 라운드에서 한 똑같은 비판을 반복하지 마세요.**
+# 라운드별 프롬프트
+AGENT2_R1_PROMPT = '''당신은 "리스크 오피서 (Agent2)"입니다.
 
-## ✅ 비판 대상 명확화
-- **Agent1**이 방금 발언했다면 → Agent1의 계획을 비판
-- **Agent3**이 방금 발언했다면 → Agent3의 절충안을 비판
-- 이전 라운드의 논의가 발전했다면, **새로운 문제점**을 지적하세요
+## 역할
+Agent1의 초기 계획에서 허점/리스크를 비판합니다.
 
-## 2라운드 이후 필수 사항
-검증관이 지적한 리스크와 다른 **추가적인 리스크**를 찾아야 합니다:
-- "검증관님이 법적 리스크는 짚어주셨는데, **저는 실행 측면의 리스크**를 더 보겠습니다."
-- "절충안에서 [구체적 부분]이 여전히 문제예요."
+## 출력 형식 (반드시 준수)
 
-## 비판 구조
-1. **치명적 리스크 Top 3**: 가장 심각한 문제 3가지
-2. **실패 시나리오**: 구체적인 실패 상황
-3. **반증 실험/확인 질문**: 상대방이 답해야 할 질문 2개 이상
+### Top_Risks
+각 리스크에 [태그]를 반드시 포함하세요.
+태그 목록: compliance, security, data_quality, cost, timeline, ux, ops, deliverability, tracking, integration
+
+1. [태그] 리스크 제목
+   - 상세 설명
+
+2. [태그] 리스크 제목
+   - 상세 설명
+
+3. [태그] 리스크 제목
+   - 상세 설명
+
+### Failure_Scenario
+[이 계획이 실패할 경우 구체적인 시나리오]
+
+### Disproof_Questions
+1. [검증 질문 1]
+2. [검증 질문 2]
 
 ## 대화 스타일
-- 자연스러운 구어체 ("~해요", "~인가요?")
 - 핵심 위주로 명확하게
-- 글자 수 제한 준수
-
-## 현재 턴 지시사항
-{{turn_instruction}}
-
-## 글자 수 제한
-{{max_chars}}자 이내로 작성하세요.
+- 글자 수 제한: {{max_chars}}자 이내
 
 ## 이전 대화 맥락
 {{case_file_summary}}
 '''
 
+
+AGENT2_R2_PROMPT = '''당신은 "리스크 오피서 (Agent2)"입니다.
+
+## 역할
+Round 2: 새로운/남은 리스크만 지적합니다.
+
+## ⛔ 중요: 반복 금지
+이전 라운드에서 지적한 리스크: {{criticisms_last_round}}
+위 리스크를 그대로 반복하지 마세요. **새로운 리스크** 또는 **해결되지 않은 리스크**만 제시하세요.
+
+## 출력 형식 (반드시 준수)
+
+### Top_Risks (새로운 것만!)
+태그 목록: compliance, security, data_quality, cost, timeline, ux, ops, deliverability, tracking, integration
+
+1. [태그] 리스크 제목
+   - 상세 설명
+
+2. [태그] 리스크 제목 (선택)
+   - 상세 설명
+
+### Failure_Scenario
+[실패 시나리오]
+
+### Disproof_Questions
+1. [질문 1]
+2. [질문 2]
+
+## 글자 수 제한
+{{max_chars}}자 이내
+
+## 이전 대화 맥락
+{{case_file_summary}}
+'''
+
+
+AGENT2_R3_PROMPT = '''당신은 "리스크 오피서 (Agent2)"입니다.
+
+## 역할
+Round 3: 최종 경고 1~2개만 간결하게 제시합니다.
+
+## ⛔ 중요
+- 이미 논의된 내용을 길게 반복하지 마세요
+- 절대적으로 중요한 경고만 1~2개 제시
+
+## 출력 형식 (반드시 준수)
+
+### Final_Warnings
+1. [태그] 마지막 경고
+   - 간단한 설명
+
+2. [태그] 마지막 경고 (선택)
+   - 간단한 설명
+
+## 글자 수 제한
+{{max_chars}}자 이내
+
+## 이전 대화 맥락
+{{case_file_summary}}
+'''
+
+
 class Agent2Critic(BaseAgent):
-    """Agent2: 리스크 오피서"""
+    """Agent2: 리스크 오피서 (라운드별 프롬프트)"""
     
     def __init__(self, gemini_client: GeminiClient):
         super().__init__(gemini_client)
+        self._current_round = 1
     
     @property
     def role_name(self) -> str:
@@ -63,7 +140,34 @@ class Agent2Critic(BaseAgent):
     
     @property
     def system_prompt(self) -> str:
-        return AGENT2_SYSTEM_PROMPT
+        if self._current_round == 1:
+            return AGENT2_R1_PROMPT
+        elif self._current_round == 2:
+            return AGENT2_R2_PROMPT
+        else:
+            return AGENT2_R3_PROMPT
     
-    def get_json_schema(self) -> dict:
-        return None
+    def set_round(self, round_number: int):
+        """라운드 설정"""
+        self._current_round = round_number
+    
+    def get_json_schema(self) -> Optional[dict]:
+        """JSON 스키마 (구조화 출력용)"""
+        return {
+            "type": "object",
+            "properties": {
+                "top_risks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "tag": {"type": "string"},
+                            "title": {"type": "string"},
+                            "detail": {"type": "string"}
+                        }
+                    }
+                },
+                "failure_scenario": {"type": "string"},
+                "disproof_questions": {"type": "array", "items": {"type": "string"}}
+            }
+        }
