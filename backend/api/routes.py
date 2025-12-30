@@ -310,6 +310,9 @@ async def execute_round(session_id: str, current_round: int):
         # Phase 실행
         result = await execute_phase(session_id, phase, config)
         
+        # API Rate Limit 방지를 위한 딜레이 (Gemini 429 에러 방지)
+        await asyncio.sleep(3)
+        
         # Verifier gate 결과 추출
         if "V_R2_GATE" in phase or "V_R3_SIGNOFF" in phase or "V_R1_AUDIT" in phase:
             gate_status = extract_gate_status(result)
