@@ -2,6 +2,7 @@ import { useSessionEvents } from '@/lib/useSessionEvents'
 import GateSummaryCard from '@/components/gate/GateSummaryCard'
 import SteeringPanel from '@/components/gate/SteeringPanel'
 import EndGateCard from '@/components/gate/EndGateCard'
+import styles from './page.module.css'
 
 // ... (existing imports)
 
