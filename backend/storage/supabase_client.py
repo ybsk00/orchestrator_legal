@@ -44,6 +44,16 @@ async def get_session(session_id: str) -> dict:
     return result.data
 
 
+async def list_sessions(user_id: str = None) -> list:
+    """세션 목록 조회"""
+    client = get_supabase_client()
+    query = client.table("sessions").select("*").order("created_at", desc=True)
+    if user_id:
+        query = query.eq("user_id", user_id)
+    result = query.execute()
+    return result.data or []
+
+
 async def update_session(session_id: str, updates: dict) -> dict:
     """세션 업데이트"""
     client = get_supabase_client()

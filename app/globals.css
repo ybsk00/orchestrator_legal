@@ -6,6 +6,7 @@
   --agent1: #10b981;
   --agent2: #f59e0b;
   --agent3: #8b5cf6;
+  --verifier: #ef4444;
 }
 
 * {
@@ -38,10 +39,30 @@ button {
 }
 
 /* 에이전트 색상 */
-.agent1 { color: var(--agent1); }
-.agent2 { color: var(--agent2); }
-.agent3 { color: var(--agent3); }
+.agent1 {
+  color: var(--agent1);
+}
 
-.agent1-bg { background-color: var(--agent1); }
-.agent2-bg { background-color: var(--agent2); }
-.agent3-bg { background-color: var(--agent3); }
+.agent2 {
+  color: var(--agent2);
+}
+
+.agent3 {
+  color: var(--agent3);
+}
+
+.agent1-bg {
+  background-color: var(--agent1);
+}
+
+.agent2-bg {
+  background-color: var(--agent2);
+}
+
+.agent3-bg {
+  background-color: var(--agent3);
+}
+
+.verifier-bg {
+  background-color: var(--verifier);
+}

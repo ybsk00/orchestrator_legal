@@ -1,7 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
+import { Canvas } from '@react-three/fiber'
+import { OrbitControls, Environment, ContactShadows } from '@react-three/drei'
 import styles from './page.module.css'
+import AgentAvatar from '@/components/scene/AgentAvatar'
 
 type Category = 'newbiz' | 'marketing' | 'dev' | 'domain'
 
@@ -11,6 +14,58 @@ const CATEGORIES: { value: Category; label: string; description: string }[] = [
     { value: 'dev', label: '개발', description: '기술 아키텍처 및 구현 계획' },
     { value: 'domain', label: '영역', description: '운영/프로세스/정책 의사결정' },
 ]
+
+function HeroScene() {
+    return (
+        <Canvas camera={{ position: [0, 2, 6], fov: 45 }}>
+            <ambientLight intensity={0.5} />
+            <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} castShadow />
+            <Environment preset="city" />
+
+            <group position={[0, -1, 0]}>
+                {/* Agent 1 */}
+                <AgentAvatar
+                    agentId="agent1"
+                    modelPath="/models/agent1.glb"
+                    position={[-2, 0, 0]}
+                    rotation={[0, 0.5, 0]}
+                    isSpeaking={false}
+                    fallbackColor="#10b981"
+                />
+                {/* Agent 2 */}
+                <AgentAvatar
+                    agentId="agent2"
+                    modelPath="/models/agent2.glb"
+                    position={[-0.7, 0, 0.5]}
+                    rotation={[0, 0.2, 0]}
+                    isSpeaking={false}
+                    fallbackColor="#f59e0b"
+                />
+                {/* Agent 3 */}
+                <AgentAvatar
+                    agentId="agent3"
+                    modelPath="/models/agent3.glb"
+                    position={[0.7, 0, 0.5]}
+                    rotation={[0, -0.2, 0]}
+                    isSpeaking={false}
+                    fallbackColor="#8b5cf6"
+                />
+                {/* Verifier */}
+                <AgentAvatar
+                    agentId="verifier"
+                    modelPath="/models/verifier.glb"
+                    position={[2, 0, 0]}
+                    rotation={[0, -0.5, 0]}
+                    isSpeaking={false}
+                    fallbackColor="#ef4444"
+                />
+                <ContactShadows resolution={1024} scale={10} blur={1} opacity={0.5} far={1} color="#000000" />
+            </group>
+
+            <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={Math.PI / 3} maxPolarAngle={Math.PI / 2} />
+        </Canvas>
+    )
+}
 
 export default function Home() {
     const [category, setCategory] = useState<Category | ''>('')
@@ -44,9 +99,14 @@ export default function Home() {
         <main className={styles.main}>
             <div className={styles.container}>
                 <header className={styles.header}>
+                    <div className={styles.heroScene}>
+                        <Suspense fallback={null}>
+                            <HeroScene />
+                        </Suspense>
+                    </div>
                     <h1 className={styles.title}>🤖 3 에이전트 오케스트레이터</h1>
                     <p className={styles.subtitle}>
-                        AI 에이전트 3명이 토론 형식으로 의사결정을 도와드립니다
+                        AI에게 회의 새로운 아이디어 및 계획을 AI에게 회의를 맡겨서 만들어보는 시스템입니다.
                     </p>
                 </header>
 
@@ -89,19 +149,24 @@ export default function Home() {
                     <h3>참여 에이전트</h3>
                     <div className={styles.agentGrid}>
                         <div className={styles.agentCard}>
-                            <span className="agent1">Agent 1</span>
+                            <span className="agent1" style={{ color: 'var(--agent1)' }}>Agent 1</span>
                             <strong>구현계획 전문가</strong>
                             <p>구체적인 실행 방안과 KPI를 제시합니다</p>
                         </div>
                         <div className={styles.agentCard}>
-                            <span className="agent2">Agent 2</span>
+                            <span className="agent2" style={{ color: 'var(--agent2)' }}>Agent 2</span>
                             <strong>리스크 오피서</strong>
                             <p>허점과 리스크를 공격하고 검증 방안을 제시합니다</p>
                         </div>
                         <div className={styles.agentCard}>
-                            <span className="agent3">Agent 3</span>
+                            <span className="agent3" style={{ color: 'var(--agent3)' }}>Agent 3</span>
                             <strong>합의안 설계자</strong>
                             <p>절충안과 개선된 실행 계획을 도출합니다</p>
+                        </div>
+                        <div className={styles.agentCard}>
+                            <span className="verifier" style={{ color: 'var(--verifier)' }}>Verifier</span>
+                            <strong>검증관</strong>
+                            <p>법적 안전장치 및 리스크 대응을 검증하고 정리합니다</p>
                         </div>
                     </div>
                 </div>

@@ -61,7 +61,7 @@ export default function SessionPage() {
     useEffect(() => {
         if (messages.length > 0) {
             const lastMsg = messages[messages.length - 1]
-            if (['agent1', 'agent2', 'agent3'].includes(lastMsg.role)) {
+            if (['agent1', 'agent2', 'agent3', 'verifier'].includes(lastMsg.role)) {
                 setActiveSpeaker(lastMsg.role)
             } else {
                 setActiveSpeaker(null)
@@ -127,6 +127,7 @@ export default function SessionPage() {
             case 'agent1': return '🔵 Agent 1: 구현계획'
             case 'agent2': return '🟠 Agent 2: 리스크'
             case 'agent3': return '🟣 Agent 3: 합의안'
+            case 'verifier': return '🔴 Verifier: 검증관'
             case 'user': return '👤 You'
             default: return '⚙️ System'
         }
@@ -182,7 +183,7 @@ export default function SessionPage() {
                                     {msg.isStreaming && <span className={styles.streamingDot}>●</span>}
                                 </div>
                                 <div className={styles.messageContent}>
-                                    {['agent1', 'agent2', 'agent3'].includes(msg.role) ? (
+                                    {['agent1', 'agent2', 'agent3', 'verifier'].includes(msg.role) ? (
                                         <TypingMessage text={msg.content} speed={20} />
                                     ) : (
                                         msg.content

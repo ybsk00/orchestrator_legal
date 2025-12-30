@@ -15,7 +15,9 @@ from orchestrator.stop_detector import stop_detector, StopConfidence
 from agents.base_agent import gemini_client
 from agents.agent1_planner import Agent1Planner
 from agents.agent2_critic import Agent2Critic
+from agents.agent2_critic import Agent2Critic
 from agents.agent3_synthesizer import Agent3Synthesizer
+from agents.verifier import VerifierAgent
 from storage import supabase_client as db
 from .events import sse_event_manager, EventType
 from config import BASE_URL  # config.py에 BASE_URL 추가 필요
@@ -31,6 +33,7 @@ agents = {
     AgentRole.AGENT1: Agent1Planner(gemini_client),
     AgentRole.AGENT2: Agent2Critic(gemini_client),
     AgentRole.AGENT3: Agent3Synthesizer(gemini_client),
+    AgentRole.VERIFIER: VerifierAgent(gemini_client),
 }
 
 
@@ -259,6 +262,29 @@ async def get_session_endpoint(session_id: str):
             phase=session_data.get("phase", "idle") or "idle"
         )
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/sessions", response_model=List[SessionResponse])
+async def list_sessions_endpoint(user_id: Optional[str] = Query(None)):
+    """
+    세션 목록 조회
+    """
+    try:
+        # DB에서 세션 목록 조회 (supabase_client에 list_sessions 추가 필요)
+        sessions = await db.list_sessions(user_id)
+        return [
+            SessionResponse(
+                id=s["id"],
+                status=s["status"],
+                category=s["category"],
+                topic=s["topic"],
+                round_index=s.get("round_index", 0) or 0,
+                phase=s.get("phase", "idle") or "idle"
+            ) for s in sessions
+        ]
+    except Exception as e:
+        logger.error(f"[ListSessions] 오류 발생: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

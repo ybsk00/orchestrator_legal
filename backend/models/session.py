@@ -16,6 +16,7 @@ class Phase(str, Enum):
     A3_SYN_1 = "A3_SYN_1"         # Agent3: 절충안/개선방향
     A2_CRIT_2 = "A2_CRIT_2"       # Agent2: 재반박
     A3_SYN_FINAL = "A3_SYN_FINAL" # Agent3: 최종 절충안(라운드 결론)
+    VERIFIER_REVIEW = "VERIFIER_REVIEW" # Verifier: 검증 및 정리
     FINALIZING = "finalizing"
     FINALIZED = "finalized"
 
@@ -59,7 +60,8 @@ class Session(BaseModel):
             Phase.A2_CRIT_1: Phase.A3_SYN_1,
             Phase.A3_SYN_1: Phase.A2_CRIT_2,
             Phase.A2_CRIT_2: Phase.A3_SYN_FINAL,
-            Phase.A3_SYN_FINAL: Phase.IDLE,
+            Phase.A3_SYN_FINAL: Phase.VERIFIER_REVIEW,
+            Phase.VERIFIER_REVIEW: Phase.IDLE,
         }
         return transitions.get(self.phase)
     
@@ -71,6 +73,7 @@ class Session(BaseModel):
             Phase.A3_SYN_1: "agent3",
             Phase.A2_CRIT_2: "agent2",
             Phase.A3_SYN_FINAL: "agent3",
+            Phase.VERIFIER_REVIEW: "verifier",
         }
         return agent_map.get(self.phase)
     
