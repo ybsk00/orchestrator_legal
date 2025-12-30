@@ -393,18 +393,6 @@
     width: 48px;
     height: 48px;
     border: 4px solid #e5e5e5;
-    border-top-color: #6366f1;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-color: #ddd;
-white-space: pre-wrap;
-}
-
-/* 입력 영역 */
-.inputContainer {
-    display: flex;
     gap: 0.75rem;
     padding: 1.5rem;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
