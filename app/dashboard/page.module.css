@@ -32,24 +32,6 @@
     align-items: center;
     gap: 0.75rem;
     text-decoration: none;
-}
-
-.logoIcon {
-    font-size: 1.75rem;
-}
-
-.logoText {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #fff;
-    background: linear-gradient(135deg, #6366f1, #a855f7);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-.nav {
-    padding: 1rem;
-    display: flex;
     flex-direction: column;
     gap: 0.5rem;
 }
@@ -284,24 +266,6 @@
     transition: all 0.3s ease;
 }
 
-.statCard:hover {
-    background: rgba(255, 255, 255, 0.05);
-    transform: translateY(-2px);
-}
-
-.statNumber {
-    font-size: 2.5rem;
-    font-weight: 800;
-    background: linear-gradient(135deg, #6366f1, #a855f7);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-.statLabel {
-    font-size: 0.9rem;
-    color: #888;
-}
-
 /* Session List */
 .sessionListHeader {
     font-size: 0.9rem;
@@ -359,34 +323,6 @@
 .sessionStatus.completed {
     color: #10b981;
     background: rgba(16, 185, 129, 0.1);
-}
-
-.sessionStatus.active {
-    color: #f59e0b;
-    background: rgba(245, 158, 11, 0.1);
-}
-
-.sessionTopic {
-    font-size: 1.05rem;
-    font-weight: 600;
-    color: #fff;
-    margin-bottom: 0.5rem;
-    line-height: 1.4;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-.sessionDate {
-    font-size: 0.8rem;
-    color: #666;
-    margin-bottom: 1rem;
-}
-
-.sessionActions {
-    display: flex;
-    gap: 0.5rem;
 }
 
 .viewBtn,
