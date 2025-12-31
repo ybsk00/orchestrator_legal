@@ -39,7 +39,7 @@ export default function DashboardPage() {
     const [topic, setTopic] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [user, setUser] = useState<any>(null)
-    const [sidebarOpen, setSidebarOpen] = useState(true)
+    const [sidebarOpen, setSidebarOpen] = useState(false)
     const [filterCategory, setFilterCategory] = useState<Category>('')
     const [filterDate, setFilterDate] = useState('all')
     const [searchQuery, setSearchQuery] = useState('')
