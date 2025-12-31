@@ -86,13 +86,6 @@
 }
 
 @media print {
-    * {
-        background: #fff !important;
-        color: #000 !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-    }
-
     .actions {
         display: none !important;
     }
@@ -102,24 +95,34 @@
         max-width: 100%;
         min-height: auto;
         background: #fff !important;
+        color: #000 !important;
     }
 
     .header {
         border-bottom: 1px solid #ccc;
+        background: #fff !important;
+    }
+
+    .header h1 {
+        color: #000 !important;
+    }
+
+    .reportContent {
+        background: #fff !important;
+        color: #000 !important;
     }
 
     .preContent {
         border: none;
         padding: 0;
         background: #fff !important;
+        color: #000 !important;
         page-break-inside: auto;
     }
 
-    body {
+    .loading,
+    .error {
         background: #fff !important;
-    }
-
-    html {
-        background: #fff !important;
+        color: #000 !important;
     }
 }
