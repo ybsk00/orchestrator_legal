@@ -49,6 +49,7 @@ export default function DashboardPage() {
     const [user, setUser] = useState<any>(null)
     const [sidebarOpen, setSidebarOpen] = useState(false)
     const [filterCategory, setFilterCategory] = useState<Category>('')
+    const [filterCaseType, setFilterCaseType] = useState<CaseType>('')  // 법무 필터
     const [filterDate, setFilterDate] = useState('all')
     const [searchQuery, setSearchQuery] = useState('')
     const [activeTab, setActiveTab] = useState<'new' | 'history'>('history')
@@ -117,8 +118,13 @@ export default function DashboardPage() {
             )
         }
 
+        // Case type filter (법무)
+        if (filterCaseType) {
+            result = result.filter(s => s.case_type === filterCaseType)
+        }
+
         return result
-    }, [sessions, filterCategory, filterDate, searchQuery])
+    }, [sessions, filterCategory, filterCaseType, filterDate, searchQuery])
 
     // 페이지네이션 계산
     const totalPages = Math.ceil(filteredSessions.length / ITEMS_PER_PAGE)
@@ -130,7 +136,7 @@ export default function DashboardPage() {
     // 필터 변경시 1페이지로 리셋
     useEffect(() => {
         setCurrentPage(1)
-    }, [filterCategory, filterDate, searchQuery])
+    }, [filterCategory, filterCaseType, filterDate, searchQuery])
 
     const handleStartSession = async () => {
         // 법무 시뮬레이션 모드
@@ -245,6 +251,43 @@ export default function DashboardPage() {
                                 </span>
                             </button>
                         ))}
+                    </div>
+                </div>
+
+                {/* 법무 필터 섹션 */}
+                <div className={styles.sidebarSection}>
+                    <h4 className={styles.sidebarLabel}>법무 필터</h4>
+                    <div className={styles.filterList}>
+                        <button
+                            className={`${styles.filterItem} ${filterCaseType === '' ? styles.active : ''}`}
+                            onClick={() => setFilterCaseType('')}
+                        >
+                            <span>⚖️</span>
+                            <span>전체</span>
+                            <span className={styles.filterCount}>
+                                {sessions.filter(s => s.case_type).length}
+                            </span>
+                        </button>
+                        <button
+                            className={`${styles.filterItem} ${filterCaseType === 'criminal' ? styles.active : ''}`}
+                            onClick={() => setFilterCaseType('criminal')}
+                        >
+                            <span>🔨</span>
+                            <span>형사</span>
+                            <span className={styles.filterCount}>
+                                {sessions.filter(s => s.case_type === 'criminal').length}
+                            </span>
+                        </button>
+                        <button
+                            className={`${styles.filterItem} ${filterCaseType === 'civil' ? styles.active : ''}`}
+                            onClick={() => setFilterCaseType('civil')}
+                        >
+                            <span>📄</span>
+                            <span>민사</span>
+                            <span className={styles.filterCount}>
+                                {sessions.filter(s => s.case_type === 'civil').length}
+                            </span>
+                        </button>
                     </div>
                 </div>
 
