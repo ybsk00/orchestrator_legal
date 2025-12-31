@@ -99,7 +99,7 @@ class SteeringRequest(BaseModel):
 class SessionResponse(BaseModel):
     id: str
     status: str
-    category: str
+    category: Optional[str] = None  # 일반 토론용 (법무 세션은 None)
     topic: str
     round_index: int
     phase: str
