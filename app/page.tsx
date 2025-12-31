@@ -1,110 +1,89 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import styles from './page.module.css'
+import NeuralNetworkBackground from '@/components/3d/NeuralNetworkBackground'
 
-// Animated particles background
-function AnimatedBackground() {
-    const canvasRef = useRef<HTMLCanvasElement>(null)
-
-    useEffect(() => {
-        const canvas = canvasRef.current
-        if (!canvas) return
-
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return
-
-        let animationId: number
-        const particles: { x: number; y: number; vx: number; vy: number; size: number; alpha: number }[] = []
-        const particleCount = 100
-
-        const resize = () => {
-            canvas.width = window.innerWidth
-            canvas.height = window.innerHeight
-        }
-        resize()
-        window.addEventListener('resize', resize)
-
-        for (let i = 0; i < particleCount; i++) {
-            particles.push({
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height,
-                vx: (Math.random() - 0.5) * 0.8,
-                vy: (Math.random() - 0.5) * 0.8,
-                size: Math.random() * 3 + 1,
-                alpha: Math.random() * 0.6 + 0.3
-            })
-        }
-
-        const animate = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-            particles.forEach((p1, i) => {
-                particles.slice(i + 1).forEach(p2 => {
-                    const dx = p1.x - p2.x
-                    const dy = p1.y - p2.y
-                    const dist = Math.sqrt(dx * dx + dy * dy)
-                    if (dist < 180) {
-                        ctx.beginPath()
-                        ctx.strokeStyle = `rgba(99, 102, 241, ${0.25 * (1 - dist / 180)})`
-                        ctx.lineWidth = 1.5
-                        ctx.moveTo(p1.x, p1.y)
-                        ctx.lineTo(p2.x, p2.y)
-                        ctx.stroke()
-                    }
-                })
-            })
-
-            particles.forEach(p => {
-                ctx.beginPath()
-                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
-                ctx.fillStyle = `rgba(139, 92, 246, ${p.alpha})`
-                ctx.fill()
-
-                p.x += p.vx
-                p.y += p.vy
-
-                if (p.x < 0 || p.x > canvas.width) p.vx *= -1
-                if (p.y < 0 || p.y > canvas.height) p.vy *= -1
-            })
-
-            animationId = requestAnimationFrame(animate)
-        }
-        animate()
-
-        return () => {
-            window.removeEventListener('resize', resize)
-            cancelAnimationFrame(animationId)
-        }
-    }, [])
-
-    return <canvas ref={canvasRef} className={styles.canvas} />
-}
-
-const AGENTS = [
-    { id: 'agent1', name: 'Agent 1', role: '구현계획 전문가', desc: '구체적인 실행 방안과 KPI를 제시합니다', color: '#10b981', icon: '🎯' },
-    { id: 'agent2', name: 'Agent 2', role: '리스크 분석가', desc: '허점과 리스크를 분석하고 검증 방안을 제시합니다', color: '#f59e0b', icon: '⚠️' },
-    { id: 'agent3', name: 'Agent 3', role: '합의안 설계자', desc: '절충안과 개선된 실행 계획을 도출합니다', color: '#8b5cf6', icon: '🤝' },
-    { id: 'verifier', name: 'Verifier', role: '검증관', desc: '법적 안전장치 및 리스크 대응을 검증합니다', color: '#ef4444', icon: '✅' },
+const PROJECTS = [
+    {
+        id: 'general',
+        title: '일반 프로젝트',
+        desc: '데이터 분석 및 리서치 업무를 위한 표준 오케스트레이션입니다.',
+        icon: '📁',
+        link: '/dashboard?mode=general'
+    },
+    {
+        id: 'dev',
+        title: '개발 프로젝트',
+        desc: '풀스택 코드 생성, 리팩토링 및 배포 파이프라인을 관리합니다.',
+        icon: '💻',
+        link: '/dashboard?mode=dev_project'
+    },
+    {
+        id: 'legal',
+        title: '법무 검토',
+        desc: '계약서 분석, 규제 준수 확인 및 리스크 평가를 수행합니다.',
+        icon: '⚖️',
+        link: '/dashboard?mode=legal'
+    },
 ]
 
-const FEATURES = [
-    { icon: '🤖', title: '다중 AI 에이전트', desc: '4명의 전문 AI가 서로 다른 관점에서 토론합니다' },
-    { icon: '💡', title: '자동 합의 도출', desc: '여러 라운드를 거쳐 최적의 합의안을 생성합니다' },
-    { icon: '📊', title: '실시간 협업', desc: '실시간으로 AI 토론 과정을 확인할 수 있습니다' },
-    { icon: '📑', title: '최종 리포트', desc: '토론 결과를 정리한 상세 리포트를 제공합니다' },
+const AGENTS = [
+    {
+        id: 'alpha',
+        name: 'Agent Alpha',
+        role: '전략 노드',
+        status: 'Idle',
+        load: '12%',
+        desc: '새로운 전략 지시를 대기하고 있습니다.',
+        color: '#10b981'
+    },
+    {
+        id: 'beta',
+        name: 'Agent Beta',
+        role: '개발 노드',
+        status: 'Active',
+        load: '89%',
+        desc: '현재 API 엔드포인트 리팩토링 작업을 수행 중입니다...',
+        color: '#8b5cf6'
+    },
+    {
+        id: 'gamma',
+        name: 'Agent Gamma',
+        role: '법무 노드',
+        status: 'Idle',
+        load: '0%',
+        desc: '규제 준수 스캔 완료. 대기 상태입니다.',
+        color: '#f59e0b'
+    },
+    {
+        id: 'delta',
+        name: 'Agent Delta',
+        role: 'QA 노드',
+        status: 'Waiting',
+        load: '5%',
+        desc: 'Agent Beta의 산출물을 기다리고 있습니다.',
+        color: '#f97316'
+    },
+]
+
+const LOGS = [
+    { time: '10:42:01', msg: 'System initialization complete. Orchestrator ready.', type: 'info' },
+    { time: '10:42:05', msg: 'Connection to Neural Cluster established (4 nodes).', type: 'info' },
+    { time: '10:45:12', msg: 'Agent Beta started task: "API Refactoring - Module Auth".', type: 'highlight' },
+    { time: '10:46:30', msg: 'Agent Gamma completed compliance scan. 0 issues found.', type: 'success' },
+    { time: '10:48:15', msg: 'Warning: Memory usage spike on Node Delta. Stabilizing...', type: 'warning' },
+    { time: '10:48:18', msg: 'Stability restored. Optimization routines active.', type: 'success' },
 ]
 
 export default function HomePage() {
-    const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
     const [isLoggedIn, setIsLoggedIn] = useState(false)
     const router = useRouter()
     const supabase = createClient()
 
-    // 로그인 상태 확인
     useEffect(() => {
         const checkAuth = async () => {
             const { data: { user } } = await supabase.auth.getUser()
@@ -113,120 +92,178 @@ export default function HomePage() {
         checkAuth()
     }, [supabase])
 
-    const handleStart = () => {
-        // 로그인된 상태면 바로 대시보드로, 아니면 로그인 페이지로
-        if (isLoggedIn) {
-            router.push('/dashboard')
-        } else {
-            router.push('/login')
-        }
-    }
-
-    const handleMouseMove = (e: React.MouseEvent) => {
-        const rect = e.currentTarget.getBoundingClientRect()
-        setMousePos({
-            x: (e.clientX - rect.left) / rect.width,
-            y: (e.clientY - rect.top) / rect.height
-        })
-    }
-
     return (
         <main className={styles.main}>
-            <AnimatedBackground />
+            {/* Header */}
+            <header className={styles.header}>
+                <div className={styles.headerLeft}>
+                    <Link href="/" className={styles.logo}>
+                        <span className={styles.logoIcon}>❖</span>
+                        Orchestra AI
+                    </Link>
+                </div>
+
+                <nav className={styles.nav}>
+                    <Link href="/dashboard" className={styles.navLink}>대시보드</Link>
+                    <span className={styles.navLink}>네트워크</span>
+                    <span className={styles.navLink}>뉴럴 로그</span>
+                    <span className={styles.navLink}>설정</span>
+                </nav>
+
+                <div className={styles.headerRight}>
+                    <div className={styles.systemStatus}>
+                        <div className={styles.statusDot} />
+                        SYSTEM OPTIMAL
+                    </div>
+                    {/* User Profile Placeholder */}
+                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #a855f7)' }} />
+                </div>
+            </header>
 
             <div className={styles.content}>
-                {/* Hero Section with Video */}
-                <section className={styles.hero}>
-                    <div className={styles.heroVideo}>
-                        <video
-                            src="/1.mp4"
-                            autoPlay
-                            loop
-                            muted
-                            playsInline
-                            className={styles.video}
-                        />
-                        <div className={styles.videoOverlay} />
-                    </div>
-                    <div className={styles.heroContent}>
-                        <div className={styles.badge}>AI-Powered Collaboration</div>
-                        <h1 className={styles.title}>
-                            AI 회의 <span className={styles.gradient}>협업시스템</span>
+                {/* Hero / Network Section */}
+                <section className={styles.heroGrid}>
+                    <div className={styles.heroInfo}>
+                        <div className={styles.badge}>⚡ NEURAL SYNC ACTIVE</div>
+                        <h1 className={styles.heroTitle}>
+                            AI 협업<br />
+                            오케스트레이션
                         </h1>
-                        <p className={styles.subtitle}>
-                            새로운 아이디어와 계획을 AI에게 회의를 맡겨서 만들어보세요.
-                            <br />
-                            4명의 AI 전문가가 다양한 관점에서 토론하고 최적의 결론을 도출합니다.
+                        <p className={styles.heroDesc}>
+                            실시간 뉴럴 동기화가 활성화되었습니다.<br />
+                            4개의 에이전트 노드 간의 상호작용과 효율성을 모니터링합니다.
                         </p>
-                        <div className={styles.heroButtons}>
-                            <button onClick={handleStart} className={styles.primaryButton}>
-                                {isLoggedIn ? '대시보드로 이동 →' : '시작하기 →'}
+
+                        <div className={styles.heroActions}>
+                            <Link href="/dashboard" className={styles.primaryBtn}>
+                                <span>📊</span> 네트워크 그래프 보기
+                            </Link>
+                            <button className={styles.secondaryBtn}>
+                                <span>💻</span> 시스템 진단
                             </button>
-                            {!isLoggedIn && (
-                                <Link href="/dashboard" className={styles.secondaryButton}>
-                                    대시보드
-                                </Link>
-                            )}
+                        </div>
+
+                        <div className={styles.statsRow}>
+                            <div className={styles.statItem}>
+                                <h4>98.4%</h4>
+                                <p>성공률</p>
+                            </div>
+                            <div className={styles.statItem}>
+                                <h4>12ms</h4>
+                                <p>레이턴시</p>
+                            </div>
+                            <div className={styles.statItem}>
+                                <h4>4.2TB</h4>
+                                <p>데이터 처리량</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className={styles.networkVisual}>
+                        <NeuralNetworkBackground />
+
+                        {/* Overlay Elements inside Visual */}
+                        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }}>
+                            <div style={{
+                                width: 80, height: 80,
+                                borderRadius: '50%',
+                                border: '2px solid #6366f1',
+                                boxShadow: '0 0 30px rgba(99, 102, 241, 0.5)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                background: 'rgba(5, 5, 8, 0.8)',
+                                color: '#fff', fontSize: '2rem'
+                            }}>
+                                ❖
+                            </div>
                         </div>
                     </div>
                 </section>
 
-                {/* Features Section */}
-                <section className={styles.features} onMouseMove={handleMouseMove}>
-                    <h2 className={styles.sectionTitle}>주요 기능</h2>
-                    <div className={styles.featureGrid}>
-                        {FEATURES.map((feature, idx) => (
-                            <div
-                                key={idx}
-                                className={styles.featureCard}
-                                style={{
-                                    '--mouse-x': `${mousePos.x * 100}%`,
-                                    '--mouse-y': `${mousePos.y * 100}%`,
-                                } as React.CSSProperties}
-                            >
-                                <div className={styles.cardGlow} />
-                                <span className={styles.featureIcon}>{feature.icon}</span>
-                                <h3>{feature.title}</h3>
-                                <p>{feature.desc}</p>
-                            </div>
+                {/* Initialize Project Section */}
+                <section className={styles.projects}>
+                    <div className={styles.sectionTitle}>
+                        <h2>프로젝트 시작</h2>
+                        <span className={styles.viewAll}>모든 템플릿 보기</span>
+                    </div>
+                    <div className={styles.projectGrid}>
+                        {PROJECTS.map(project => (
+                            <Link href={project.link} key={project.id} style={{ textDecoration: 'none' }}>
+                                <div className={styles.projectCard}>
+                                    <div className={styles.cardIcon}>{project.icon}</div>
+                                    <h3>{project.title}</h3>
+                                    <p>{project.desc}</p>
+                                </div>
+                            </Link>
                         ))}
                     </div>
                 </section>
 
-                {/* Agents Section */}
+                {/* Active Agents Section */}
                 <section className={styles.agents}>
-                    <h2 className={styles.sectionTitle}>참여 에이전트</h2>
+                    <div className={styles.sectionTitle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <h2>활성 에이전트</h2>
+                            <span style={{ padding: '0.2rem 0.6rem', background: 'rgba(255,255,255,0.1)', borderRadius: 12, fontSize: '0.75rem', color: '#94a3b8' }}>4 Online</span>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button className={styles.primaryBtn} style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+                                + 새 작업
+                            </button>
+                        </div>
+                    </div>
+
                     <div className={styles.agentGrid}>
                         {AGENTS.map(agent => (
                             <div key={agent.id} className={styles.agentCard}>
-                                <div className={styles.cardGlow} />
-                                <div className={styles.agentAvatar} style={{ background: `linear-gradient(135deg, ${agent.color}, ${agent.color}88)` }}>
-                                    <span>{agent.icon}</span>
+                                <div className={styles.agentImage}>
+                                    {/* Placeholder for agent visual */}
+                                    <div style={{ width: '100%', height: '100%', background: `linear-gradient(45deg, ${agent.color}22, ${agent.color}44)` }} />
+                                    <div style={{ position: 'absolute', top: 5, left: 5, fontSize: '0.6rem', padding: '2px 6px', background: 'rgba(0,0,0,0.6)', borderRadius: 4, color: '#fff' }}>
+                                        ID: {agent.id.toUpperCase()}
+                                    </div>
                                 </div>
-                                <span className={styles.agentName} style={{ color: agent.color }}>{agent.name}</span>
-                                <strong className={styles.agentRole}>{agent.role}</strong>
-                                <p className={styles.agentDesc}>{agent.desc}</p>
+                                <div className={styles.agentInfo}>
+                                    <div className={styles.agentHeader}>
+                                        <span className={styles.agentRole} style={{ color: agent.color }}>{agent.role}</span>
+                                        <div className={styles.agentStatus}>
+                                            <div className={`${styles.statusIndicator} ${agent.status === 'Active' ? styles.active : agent.status === 'Waiting' ? styles.waiting : styles.idle}`} />
+                                            {agent.status}
+                                        </div>
+                                    </div>
+                                    <h3 className={styles.agentName}>{agent.name}</h3>
+                                    <p className={styles.agentDesc}>{agent.desc}</p>
+                                    <div className={styles.agentFooter}>
+                                        <span>LOAD: {agent.load}</span>
+                                        <span className={styles.actionLink}>LOGS ↗</span>
+                                    </div>
+                                </div>
                             </div>
                         ))}
                     </div>
                 </section>
 
-                {/* CTA Section */}
-                <section className={styles.cta}>
-                    <div className={styles.ctaCard}>
-                        <div className={styles.cardGlow} />
-                        <h2>지금 바로 시작하세요</h2>
-                        <p>로그인하여 AI 협업 시스템의 모든 기능을 경험해보세요.</p>
-                        <button onClick={handleStart} className={styles.ctaButton}>
-                            {isLoggedIn ? '대시보드로 이동' : '무료로 시작하기'}
-                        </button>
+                {/* System Logs Section */}
+                <section className={styles.logsSection}>
+                    <div className={styles.logsHeader}>
+                        <div className={styles.logsTitle}>
+                            <span>📟</span> SYSTEM LOGS
+                        </div>
+                        <div className={styles.windowControls}>
+                            <div className={styles.controlDot} />
+                            <div className={styles.controlDot} />
+                            <div className={styles.controlDot} />
+                        </div>
+                    </div>
+                    <div className={styles.logContent}>
+                        {LOGS.map((log, idx) => (
+                            <div key={idx} className={styles.logEntry}>
+                                <span className={styles.logTime}>[{log.time}]</span>
+                                <span className={`${styles.logMessage} ${styles[log.type]}`}>{log.msg}</span>
+                            </div>
+                        ))}
                     </div>
                 </section>
-
-                {/* Footer */}
-                <footer className={styles.footer}>
-                    <p>© 2024 AI 회의 협업시스템. All rights reserved.</p>
-                </footer>
             </div>
         </main>
     )
