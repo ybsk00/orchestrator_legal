@@ -741,7 +741,8 @@ async def get_session_endpoint(session_id: str):
             topic=session.get("topic", ""),
             round_index=session.get("round_index", 0),
             phase=session.get("phase", ""),
-            case_type=session.get("case_type")
+            case_type=session.get("case_type"),
+            project_type=session.get("project_type", "general")
         )
     except HTTPException:
         raise
@@ -768,7 +769,8 @@ async def list_sessions_endpoint(user_id: Optional[str] = Query(None)):
                 topic=s.get("topic", ""),
                 round_index=s.get("round_index", 0) or 0,
                 phase=s.get("phase", "idle") or "idle",
-                case_type=s.get("case_type")
+                case_type=s.get("case_type"),
+                project_type=s.get("project_type", "general")
             ) for s in sessions
         ]
     except Exception as e:
