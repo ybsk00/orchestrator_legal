@@ -658,7 +658,7 @@ async def list_sessions_endpoint(user_id: Optional[str] = Query(None)):
 async def session_events_endpoint(session_id: str):
     """SSE 이벤트 스트림"""
     return StreamingResponse(
-        sse_event_manager.subscribe(session_id),
+        sse_event_manager.stream_events(session_id),
         media_type="text/event-stream"
     )
 

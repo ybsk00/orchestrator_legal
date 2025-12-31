@@ -86,17 +86,40 @@
 }
 
 @media print {
+    * {
+        background: #fff !important;
+        color: #000 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
     .actions {
-        display: none;
+        display: none !important;
     }
 
     .container {
-        padding: 0;
+        padding: 1rem;
         max-width: 100%;
+        min-height: auto;
+        background: #fff !important;
+    }
+
+    .header {
+        border-bottom: 1px solid #ccc;
     }
 
     .preContent {
         border: none;
         padding: 0;
+        background: #fff !important;
+        page-break-inside: auto;
+    }
+
+    body {
+        background: #fff !important;
+    }
+
+    html {
+        background: #fff !important;
     }
 }
