@@ -590,6 +590,201 @@
         gap: 0.5rem;
     }
 
+}
+
+.reportModalActions button {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border-radius: 8px;
+    background: #f0f0f0;
+    color: #333;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.reportModalActions button:hover {
+    background: #e5e5e5;
+}
+
+.reportModalContent {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2rem;
+}
+
+.reportLoading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem;
+    gap: 1rem;
+}
+
+.reportLoading p {
+    font-size: 1rem;
+    color: #666;
+}
+
+.spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid #e5e5e5;
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.reportText {
+    white-space: pre-wrap;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 1rem;
+    line-height: 1.8;
+    color: #333;
+    margin: 0;
+}
+
+/* 게이트 컨테이너 */
+.gateContainer {
+    margin-top: 1.5rem;
+    padding: 0 1rem 1rem 1rem;
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 법무 시뮬레이션 Facts Gate 경고 */
+.factsGateWarning {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.factsGateWarning p {
+    color: #fbbf24;
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+/* 반응형 */
+@media (max-width: 900px) {
+    .container {
+        height: 100vh;
+        height: 100dvh;
+    }
+
+    .splitLayout {
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+    }
+
+    .avatarSection {
+        display: none;
+    }
+
+    .chatSection {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .chatHeader {
+        padding: 0.75rem 1rem;
+        height: auto;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .backBtn {
+        font-size: 0.75rem;
+        padding: 0.4rem 0.75rem;
+    }
+
+    .headerInfo h2 {
+        font-size: 0.95rem;
+        max-width: 200px;
+    }
+
+    .headerActions {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .roundBadge {
+        font-size: 0.75rem;
+        padding: 0.35rem 0.75rem;
+    }
+
+    .reportBtn,
+    .finalizeBtn {
+        font-size: 0.75rem;
+        padding: 0.4rem 0.75rem;
+    }
+
+    .messageList {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .message {
+        max-width: 95%;
+        padding: 0.75rem;
+    }
+
+    .messageContent {
+        font-size: 0.9rem;
+    }
+
+    .inputContainer {
+        padding: 0.75rem 1rem;
+        flex-shrink: 0;
+    }
+
+    .input {
+        font-size: 0.95rem;
+        padding: 0.6rem 0.75rem;
+    }
+
+    .sendBtn {
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+    }
+
+    .reportModal {
+        width: 95%;
+        max-height: 90vh;
+    }
+
+    .reportModalHeader {
+        padding: 1rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
     .reportModalHeader h2 {
         font-size: 1.2rem;
         width: 100%;
@@ -598,4 +793,21 @@
     .reportModalContent {
         padding: 1rem;
     }
+}
+
+/* 대시보드로 이동 버튼 */
+.dashboardBtn {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.dashboardBtn:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: scale(1.02);
 }

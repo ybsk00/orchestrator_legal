@@ -406,6 +406,12 @@ export default function SessionPage() {
                             <div className={styles.reportModalActions}>
                                 <button onClick={() => window.print()}>인쇄 / PDF 저장</button>
                                 <button onClick={() => setShowReportModal(false)}>닫기</button>
+                                <button
+                                    className={styles.dashboardBtn}
+                                    onClick={() => router.push('/dashboard')}
+                                >
+                                    ✅ 대시보드로 이동
+                                </button>
                             </div>
                         </div>
                         <div className={styles.reportModalContent}>
