@@ -56,13 +56,14 @@ CREATE TABLE IF NOT EXISTS case_files (
     assumptions TEXT[] DEFAULT '{}',
     next_experiments TEXT[] DEFAULT '{}',
     summary_text TEXT,
+    steering JSONB DEFAULT '{}',  -- 일반 토론용 스티어링
     -- 법무 시뮬레이션용 필드
     confirmed_facts TEXT[] DEFAULT '{}',
     disputed_facts TEXT[] DEFAULT '{}',
     missing_facts_questions TEXT[] DEFAULT '{}',
     case_overview TEXT,
     parties JSONB DEFAULT '[]',
-    legal_steering JSONB DEFAULT '{}',
+    legal_steering JSONB DEFAULT '{}',  -- 법무 시뮬레이션용 스티어링
     criticisms_so_far TEXT[] DEFAULT '{}',
     criticisms_last_round TEXT[] DEFAULT '{}',
     -- 공통

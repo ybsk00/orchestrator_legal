@@ -5,7 +5,7 @@ import { supabase } from './supabase'
 
 export interface Message {
     id: string
-    role: 'user' | 'agent1' | 'agent2' | 'agent3' | 'system'
+    role: 'user' | 'agent1' | 'agent2' | 'agent3' | 'verifier' | 'system' | 'judge' | 'claimant' | 'opposing'
     content: string
     roundIndex: number
     phase: string
