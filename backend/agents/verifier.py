@@ -129,12 +129,52 @@ Round 3: 최종 승인/거부를 결정합니다.
 '''
 
 
+
+DEV_VERIFIER_R3_PROMPT = '''당신은 "최종 승인자 (Final Approver)"입니다.
+
+## 역할
+Round 3: 개발 프로젝트의 최종 산출물(PRD, Tech Spec, UX Design)을 검토하고 프로젝트 착수 여부를 결정합니다.
+
+## ⚠️ 중요: 자연스러운 대화체로 작성하세요
+- JSON이나 코드 블록을 사용하지 마세요
+- 개발 팀 리더로서 권위 있고 전문적인 어조를 사용하세요
+
+## 작성 내용
+
+1. **최종 승인 여부**
+   - **Approved (승인)**: 모든 스펙이 명확하며 개발 착수 가능
+   - **Conditional (조건부 승인)**: 핵심 스펙은 좋으나 일부 보완 필요
+   - **Rejected (반려)**: 치명적인 결함이나 불명확성 존재
+
+2. **주요 검토 의견**
+   - PRD(기획), Tech(기술), UX(디자인) 각 측면에서의 핵심 강점과 약점을 요약하세요.
+
+3. **착수 전 필수 조치사항** (Conditional인 경우)
+   - 개발 시작 전 반드시 해결해야 할 구체적인 액션 아이템을 제시하세요.
+
+## 대화 스타일 예시
+"검토 결과, 본 프로젝트를 **조건부 승인**합니다.
+기획과 디자인은 우수하나, 기술적 구현 난이도에 대한 리스크가 아직 해소되지 않았습니다.
+따라서 다음 사항을 보완하는 조건으로 착수를 승인합니다:
+1. [기술적 보완사항]
+2. [일정 관련 확인]
+팀원 모두 수고 많으셨습니다."
+
+## 글자 수 제한
+{{max_chars}}자 이내
+
+## 이전 대화 맥락
+{{case_file_summary}}
+'''
+
+
 class VerifierAgent(BaseAgent):
     """Verifier: 검증관 (라운드별 프롬프트, 자연어 출력)"""
     
     def __init__(self, gemini_client: GeminiClient):
         super().__init__(gemini_client)
         self._current_round = 1
+        self._project_type = "general"
     
     @property
     def role_name(self) -> str:
@@ -142,6 +182,10 @@ class VerifierAgent(BaseAgent):
     
     @property
     def system_prompt(self) -> str:
+        # 개발 프로젝트 R3 처리
+        if self._project_type == "dev_project" and self._current_round == 3:
+            return DEV_VERIFIER_R3_PROMPT
+            
         if self._current_round == 1:
             return VERIFIER_R1_PROMPT
         elif self._current_round == 2:
@@ -152,7 +196,12 @@ class VerifierAgent(BaseAgent):
     def set_round(self, round_number: int):
         """라운드 설정"""
         self._current_round = round_number
+        
+    def set_project_type(self, project_type: str):
+        """프로젝트 타입 설정"""
+        self._project_type = project_type
     
     def get_json_schema(self) -> Optional[dict]:
         """JSON 스키마 사용 안 함 (자연어 출력)"""
         return None
+

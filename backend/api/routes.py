@@ -160,6 +160,12 @@ async def execute_phase(session_id: str, phase: str, config: dict) -> str:
     # 라운드 설정 (Agent2/Agent3/Verifier)
     if hasattr(agent, 'set_round'):
         agent.set_round(current_round)
+        
+    # 프로젝트 타입 설정 (Verifier 등)
+    if hasattr(agent, 'set_project_type'):
+        session_data = await db.get_session(session_id)
+        if session_data:
+            agent.set_project_type(session_data.get("project_type", "general"))
     
     # 세션 및 CaseFile 조회
     session_data = await db.get_session(session_id)
