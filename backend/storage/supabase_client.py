@@ -92,9 +92,9 @@ async def get_case_file(session_id: str) -> dict:
 
 
 async def save_final_report(session_id: str, report_json: dict, report_md: str = None) -> dict:
-    """최종 리포트 저장"""
+    """최종 리포트 저장 (upsert - 이미 존재하면 업데이트)"""
     client = get_supabase_client()
-    result = client.table("final_reports").insert({
+    result = client.table("final_reports").upsert({
         "session_id": session_id,
         "report_json": report_json,
         "report_md": report_md,
@@ -103,7 +103,7 @@ async def save_final_report(session_id: str, report_json: dict, report_md: str =
 
 
 async def get_final_report(session_id: str) -> dict:
-    """최종 리포트 조회"""
+    """최종 리포트 조회 (없으면 None 반환)"""
     client = get_supabase_client()
-    result = client.table("final_reports").select("*").eq("session_id", session_id).single().execute()
-    return result.data
+    result = client.table("final_reports").select("*").eq("session_id", session_id).execute()
+    return result.data[0] if result.data else None
