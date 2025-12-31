@@ -8,6 +8,7 @@ import styles from './page.module.css'
 
 type Category = 'newbiz' | 'marketing' | 'dev' | 'domain' | ''
 type CaseType = 'criminal' | 'civil' | ''
+type Mode = 'general' | 'legal' | 'dev_project'
 
 const CATEGORIES: { value: Category; label: string; icon: string }[] = [
     { value: '', label: '전체', icon: '📋' },
@@ -54,7 +55,7 @@ export default function DashboardPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [activeTab, setActiveTab] = useState<'new' | 'history'>('history')
     const [currentPage, setCurrentPage] = useState(1)
-    const [isLegalMode, setIsLegalMode] = useState(false)  // 법무 시뮬레이션 모드
+    const [mode, setMode] = useState<Mode>('general')
     const router = useRouter()
     const supabase = createClient()
 
@@ -139,8 +140,8 @@ export default function DashboardPage() {
     }, [filterCategory, filterCaseType, filterDate, searchQuery])
 
     const handleStartSession = async () => {
-        // 법무 시뮬레이션 모드
-        if (isLegalMode) {
+        // 1. 법무 시뮬레이션 모드
+        if (mode === 'legal') {
             if (!caseType || !topic.trim()) return
 
             setIsLoading(true)
@@ -148,7 +149,12 @@ export default function DashboardPage() {
                 const response = await fetch('/api/sessions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ case_type: caseType, topic, user_id: user?.id }),
+                    body: JSON.stringify({
+                        case_type: caseType,
+                        topic,
+                        user_id: user?.id,
+                        project_type: 'legal'
+                    }),
                 })
 
                 if (response.ok) {
@@ -163,7 +169,35 @@ export default function DashboardPage() {
             return
         }
 
-        // 일반 토론 모드
+        // 2. 개발 프로젝트 모드
+        if (mode === 'dev_project') {
+            if (!topic.trim()) return
+
+            setIsLoading(true)
+            try {
+                const response = await fetch('/api/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        topic,
+                        user_id: user?.id,
+                        project_type: 'dev_project'
+                    }),
+                })
+
+                if (response.ok) {
+                    const data = await response.json()
+                    router.push(`/session/${data.session_id}`)
+                }
+            } catch (error) {
+                console.error('Failed to create dev project session:', error)
+            } finally {
+                setIsLoading(false)
+            }
+            return
+        }
+
+        // 3. 일반 토론 모드
         if (!category || !topic.trim()) return
 
         setIsLoading(true)
@@ -171,7 +205,12 @@ export default function DashboardPage() {
             const response = await fetch('/api/sessions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ category, topic, user_id: user?.id }),
+                body: JSON.stringify({
+                    category,
+                    topic,
+                    user_id: user?.id,
+                    project_type: 'general'
+                }),
             })
 
             if (response.ok) {
@@ -473,28 +512,36 @@ export default function DashboardPage() {
                             <div className={styles.formCard}>
                                 <h2>새로운 AI 회의 시작</h2>
                                 <p className={styles.formDesc}>
-                                    {isLegalMode
+                                    {mode === 'legal'
                                         ? '법무 시뮬레이션으로 모의 재판을 진행합니다.'
-                                        : 'AI 에이전트들과의 협업 회의를 시작하세요.'}
+                                        : mode === 'dev_project'
+                                            ? 'PRD, Tech, UX, DM 전문가들과 개발 프로젝트를 기획합니다.'
+                                            : 'AI 에이전트들과의 협업 회의를 시작하세요.'}
                                 </p>
 
                                 {/* 모드 선택 */}
                                 <div className={styles.modeToggle}>
                                     <button
-                                        className={`${styles.modeBtn} ${!isLegalMode ? styles.active : ''}`}
-                                        onClick={() => setIsLegalMode(false)}
+                                        className={`${styles.modeBtn} ${mode === 'general' ? styles.active : ''}`}
+                                        onClick={() => setMode('general')}
                                     >
                                         🤖 일반 토론
                                     </button>
                                     <button
-                                        className={`${styles.modeBtn} ${isLegalMode ? styles.active : ''}`}
-                                        onClick={() => setIsLegalMode(true)}
+                                        className={`${styles.modeBtn} ${mode === 'legal' ? styles.active : ''}`}
+                                        onClick={() => setMode('legal')}
                                     >
                                         ⚖️ 법무 시뮬레이션
                                     </button>
+                                    <button
+                                        className={`${styles.modeBtn} ${mode === 'dev_project' ? styles.active : ''}`}
+                                        onClick={() => setMode('dev_project')}
+                                    >
+                                        🚀 개발 프로젝트
+                                    </button>
                                 </div>
 
-                                {isLegalMode ? (
+                                {mode === 'legal' ? (
                                     /* 법무 시뮬레이션: 사건 유형 선택 */
                                     <div className={styles.formGroup}>
                                         <label>사건 유형 선택</label>
@@ -510,6 +557,19 @@ export default function DashboardPage() {
                                                     <span className={styles.caseDesc}>{ct.desc}</span>
                                                 </button>
                                             ))}
+                                        </div>
+                                    </div>
+                                ) : mode === 'dev_project' ? (
+                                    /* 개발 프로젝트: 별도 옵션 없음 (추후 추가 가능) */
+                                    <div className={styles.formGroup}>
+                                        <div className={styles.infoBox}>
+                                            <p>💡 <strong>4인의 전문가 에이전트</strong>가 참여합니다.</p>
+                                            <ul>
+                                                <li>Product Manager (기획)</li>
+                                                <li>Tech Lead (기술)</li>
+                                                <li>UX Lead (디자인)</li>
+                                                <li>Delivery Manager (일정)</li>
+                                            </ul>
                                         </div>
                                     </div>
                                 ) : (
@@ -532,12 +592,14 @@ export default function DashboardPage() {
                                 )}
 
                                 <div className={styles.formGroup}>
-                                    <label>{isLegalMode ? '사건 주제' : '토론 주제'}</label>
+                                    <label>{mode === 'legal' ? '사건 주제' : mode === 'dev_project' ? '프로젝트 아이디어' : '토론 주제'}</label>
                                     <textarea
                                         className={styles.topicTextarea}
-                                        placeholder={isLegalMode
+                                        placeholder={mode === 'legal'
                                             ? "예: '계약 위반으로 인한 손해배상 청구 사건을 시뮬레이션 해주세요.'"
-                                            : "예: 'AI 기반 고객 상담 챗봇 도입을 고려하고 있습니다. MVP 범위와 일정을 논의해주세요.'"}
+                                            : mode === 'dev_project'
+                                                ? "예: 'AI 기반 고객 상담 챗봇 도입을 고려하고 있습니다. MVP 범위와 일정을 논의해주세요.'"
+                                                : "예: '신규 사업 아이디어를 브레인스토밍 하고 싶습니다.'"}
                                         value={topic}
                                         onChange={(e) => setTopic(e.target.value)}
                                         rows={5}
@@ -547,9 +609,17 @@ export default function DashboardPage() {
                                 <button
                                     className={styles.startBtn}
                                     onClick={handleStartSession}
-                                    disabled={(isLegalMode ? !caseType : !category) || !topic.trim() || isLoading}
+                                    disabled={
+                                        (mode === 'legal' && !caseType) ||
+                                        (mode === 'general' && !category) ||
+                                        !topic.trim() ||
+                                        isLoading
+                                    }
                                 >
-                                    {isLoading ? '생성 중...' : isLegalMode ? '⚖️ 시뮬레이션 시작' : '🚀 토론 시작하기'}
+                                    {isLoading ? '생성 중...' :
+                                        mode === 'legal' ? '⚖️ 시뮬레이션 시작' :
+                                            mode === 'dev_project' ? '🚀 프로젝트 시작' :
+                                                '🤖 토론 시작하기'}
                                 </button>
                             </div>
                         </div>

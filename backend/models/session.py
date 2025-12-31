@@ -36,6 +36,13 @@ class Category(str, Enum):
     DOMAIN = "domain"       # 영역(운영/기타)
 
 
+class ProjectType(str, Enum):
+    """프로젝트 유형"""
+    GENERAL = "general"       # 일반 토론 (기본)
+    LEGAL = "legal"           # 법무 시뮬레이션
+    DEV_PROJECT = "dev_project" # 개발 프로젝트 (신규)
+
+
 class CaseType(str, Enum):
     """법무 시뮬레이션 사건 유형"""
     CRIMINAL = "criminal"  # 형사
@@ -46,6 +53,8 @@ class Session(BaseModel):
     """토론 세션"""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     status: SessionStatus = SessionStatus.ACTIVE
+    project_type: ProjectType = ProjectType.GENERAL  # 프로젝트 유형
+    
     category: Optional[Category] = None  # 레거시, 일반 토론용
     topic: str
     round_index: int = 0  # 0에서 시작, 새 라운드 시작 시 증가

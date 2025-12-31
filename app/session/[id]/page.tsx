@@ -11,6 +11,7 @@ import SteeringPanel from '@/components/gate/SteeringPanel'
 import EndGateCard from '@/components/gate/EndGateCard'
 // 법무 시뮬레이션 컴포넌트
 import { FactsIntakeForm, LegalGateForm, FactsSubmitResponse } from '@/components/legal'
+import DevProjectGateForm from '@/components/DevProjectGateForm'
 import styles from './page.module.css'
 
 // Avatar Panel은 클라이언트 사이드에서만 로드
@@ -26,7 +27,9 @@ interface SessionData {
     topic: string
     round_index: number
     phase: string
+    phase: string
     case_type?: string  // 법무 시뮬레이션: 'criminal' | 'civil'
+    project_type?: 'general' | 'legal' | 'dev_project'
 }
 
 // 법무 Phase 상수
@@ -208,12 +211,26 @@ export default function SessionPage() {
             case 'claimant': return '🔵 원고측 (검사/원고대리)'
             case 'opposing': return '🟠 피고측 (변호인/피고대리)'
             case 'user': return '👤 사용자'
+            // 개발 프로젝트 에이전트
+            case 'prd': return '🔵 PRD Owner (PM)'
+            case 'tech': return '🟠 Tech Lead (CTO)'
+            case 'ux': return '🟣 UX Lead (Designer)'
+            case 'dm': return '🔴 Delivery Manager (Agile)'
             default: return role
         }
     }
 
+    // 개발 프로젝트 에이전트 설정
+    const DEV_PROJECT_AGENTS = [
+        { id: 'prd', name: 'PRD Owner', role: 'Product Manager', colorTheme: 'blue' as const },
+        { id: 'tech', name: 'Tech Lead', role: 'CTO', colorTheme: 'orange' as const },
+        { id: 'ux', name: 'UX Lead', role: 'Product Designer', colorTheme: 'purple' as const },
+        { id: 'dm', name: 'Delivery Manager', role: 'Agile Coach', colorTheme: 'red' as const },
+    ]
+
     // 법무 세션 여부 확인
-    const isLegalSession = session?.case_type ? true : false
+    const isLegalSession = session?.project_type === 'legal' || session?.case_type
+    const isDevProject = session?.project_type === 'dev_project'
     const isLegalPhase = session?.phase ? LEGAL_PHASES.includes(session.phase) : false
 
     return (
@@ -222,7 +239,10 @@ export default function SessionPage() {
                 {/* 좌측: 아바타 패널 */}
                 <div className={styles.avatarSection}>
                     <Suspense fallback={<div className={styles.avatarPlaceholder}>로딩 중...</div>}>
-                        <AvatarPanel activeSpeaker={activeSpeaker} />
+                        <AvatarPanel
+                            activeSpeaker={activeSpeaker}
+                            agents={isDevProject ? DEV_PROJECT_AGENTS : undefined}
+                        />
                     </Suspense>
                 </div>
 
@@ -266,7 +286,7 @@ export default function SessionPage() {
                                     {msg.isStreaming && <span className={styles.streamingDot}>●</span>}
                                 </div>
                                 <div className={styles.messageContent}>
-                                    {['agent1', 'agent2', 'agent3', 'verifier', 'judge', 'claimant', 'opposing'].includes(msg.role) ? (
+                                    {['agent1', 'agent2', 'agent3', 'verifier', 'judge', 'claimant', 'opposing', 'prd', 'tech', 'ux', 'dm'].includes(msg.role) ? (
                                         <TypingMessage text={msg.content} speed={20} />
                                     ) : (
                                         msg.content
@@ -320,113 +340,132 @@ export default function SessionPage() {
                                         }}
                                     />
                                 </div>
-                            )}
-
-                        {/* 일반 토론: USER_GATE / END_GATE UI 렌더링 */}
-                        {!isLegalSession && (session?.phase === 'USER_GATE' || session?.phase === 'END_GATE') &&
-                            !messages.some(m => m.isStreaming) && (
-                                <div className={styles.gateContainer}>
-                                    {/* GateSummaryCard는 gateData가 있을 때만 표시 */}
-                                    {gateData && (
-                                        <GateSummaryCard
-                                            roundIndex={gateData.round_index}
-                                            decisionSummary={gateData.decision_summary}
-                                            openIssues={gateData.open_issues}
-                                            verifierStatus={gateData.verifier_gate_status}
-                                        />
-                                    )}
-
-                                    {session.phase === 'USER_GATE' && (
-                                        <SteeringPanel
-                                            sessionId={sessionId}
-                                            onSkip={() => handleSteeringAction('skip')}
-                                            onInput={(data) => handleSteeringAction('input', data)}
-                                            onFinalize={() => handleSteeringAction('finalize')}
-                                        />
-                                    )}
-
-                                    {session.phase === 'END_GATE' && (
-                                        <EndGateCard sessionId={sessionId} />
-                                    )}
                                 </div>
                             )}
 
-                        <div ref={messagesEndRef} />
-                    </div>
+                    {/* 개발 프로젝트: USER_GATE / END_GATE - DevProjectGateForm */}
+                    {isDevProject && (session?.phase === 'USER_GATE' || session?.phase === 'END_GATE') &&
+                        !messages.some(m => m.isStreaming) && (
+                            <div className={styles.gateContainer}>
+                                <DevProjectGateForm
+                                    sessionId={sessionId}
+                                    roundIndex={session.round_index}
+                                    phase={session.phase}
+                                    gateData={gateData}
+                                    onSubmit={(action, data) => handleSteeringAction(action, data)}
+                                />
+                            </div>
+                        )}
 
-                    {/* 입력 영역 */}
-                    <div className={styles.inputContainer}>
-                        <input
-                            type="text"
-                            className={styles.input}
-                            placeholder={
-                                session?.phase === 'USER_GATE' || session?.phase === 'END_GATE'
-                                    ? "위의 버튼을 사용하여 진행해주세요."
-                                    : "메시지를 입력하세요... (/stop 또는 /마무리로 종료)"
-                            }
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                            disabled={session?.status === 'finalized' || session?.phase === 'USER_GATE' || session?.phase === 'END_GATE'}
-                        />
-                        <button
-                            className={styles.sendBtn}
-                            onClick={handleSend}
-                            disabled={session?.status === 'finalized' || session?.phase === 'USER_GATE' || session?.phase === 'END_GATE'}
-                        >
-                            전송
+                    {/* 일반 토론: USER_GATE / END_GATE UI 렌더링 */}
+                    {!isLegalSession && !isDevProject && (session?.phase === 'USER_GATE' || session?.phase === 'END_GATE') &&
+                        !messages.some(m => m.isStreaming) && (
+                            <div className={styles.gateContainer}>
+                                {/* GateSummaryCard는 gateData가 있을 때만 표시 */}
+                                {gateData && (
+                                    <GateSummaryCard
+                                        roundIndex={gateData.round_index}
+                                        decisionSummary={gateData.decision_summary}
+                                        openIssues={gateData.open_issues}
+                                        verifierStatus={gateData.verifier_gate_status}
+                                    />
+                                )}
+
+                                {session.phase === 'USER_GATE' && (
+                                    <SteeringPanel
+                                        sessionId={sessionId}
+                                        onSkip={() => handleSteeringAction('skip')}
+                                        onInput={(data) => handleSteeringAction('input', data)}
+                                        onFinalize={() => handleSteeringAction('finalize')}
+                                    />
+                                )}
+
+                                {session.phase === 'END_GATE' && (
+                                    <EndGateCard sessionId={sessionId} />
+                                )}
+                            </div>
+                        )}
+
+                    <div ref={messagesEndRef} />
+                </div>
+
+                {/* 입력 영역 */}
+                <div className={styles.inputContainer}>
+                    <input
+                        type="text"
+                        className={styles.input}
+                        placeholder={
+                            session?.phase === 'USER_GATE' || session?.phase === 'END_GATE'
+                                ? "위의 버튼을 사용하여 진행해주세요."
+                                : "메시지를 입력하세요... (/stop 또는 /마무리로 종료)"
+                        }
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                        disabled={session?.status === 'finalized' || session?.phase === 'USER_GATE' || session?.phase === 'END_GATE'}
+                    />
+                    <button
+                        className={styles.sendBtn}
+                        onClick={handleSend}
+                        disabled={session?.status === 'finalized' || session?.phase === 'USER_GATE' || session?.phase === 'END_GATE'}
+                    >
+                        전송
+                    </button>
+                </div>
+            </div>
+        </div>
+
+            {/* 종료 확인 모달 */ }
+    {
+        showStopConfirm && (
+            <div className={styles.modalOverlay}>
+                <div className={styles.modal}>
+                    <h3>토론을 마무리할까요?</h3>
+                    <p>"{stopTrigger}" 키워드가 감지되었습니다.</p>
+                    <p>마무리하면 Agent3가 최종 결과물을 생성합니다.</p>
+                    <div className={styles.modalActions}>
+                        <button onClick={() => handleConfirmStop(false)}>계속 토론</button>
+                        <button className={styles.primary} onClick={() => handleConfirmStop(true)}>
+                            마무리하기
                         </button>
                     </div>
                 </div>
             </div>
+        )
+    }
 
-            {/* 종료 확인 모달 */}
-            {showStopConfirm && (
-                <div className={styles.modalOverlay}>
-                    <div className={styles.modal}>
-                        <h3>토론을 마무리할까요?</h3>
-                        <p>"{stopTrigger}" 키워드가 감지되었습니다.</p>
-                        <p>마무리하면 Agent3가 최종 결과물을 생성합니다.</p>
-                        <div className={styles.modalActions}>
-                            <button onClick={() => handleConfirmStop(false)}>계속 토론</button>
-                            <button className={styles.primary} onClick={() => handleConfirmStop(true)}>
-                                마무리하기
+    {/* 리포트 모달 */ }
+    {
+        showReportModal && (
+            <div className={styles.modalOverlay} onClick={() => setShowReportModal(false)}>
+                <div className={styles.reportModal} onClick={(e) => e.stopPropagation()}>
+                    <div className={styles.reportModalHeader}>
+                        <h2>📑 최종 합의 리포트</h2>
+                        <div className={styles.reportModalActions}>
+                            <button onClick={() => window.print()}>인쇄 / PDF 저장</button>
+                            <button onClick={() => setShowReportModal(false)}>닫기</button>
+                            <button
+                                className={styles.dashboardBtn}
+                                onClick={() => router.push('/dashboard')}
+                            >
+                                ✅ 대시보드로 이동
                             </button>
                         </div>
                     </div>
-                </div>
-            )}
-
-            {/* 리포트 모달 */}
-            {showReportModal && (
-                <div className={styles.modalOverlay} onClick={() => setShowReportModal(false)}>
-                    <div className={styles.reportModal} onClick={(e) => e.stopPropagation()}>
-                        <div className={styles.reportModalHeader}>
-                            <h2>📑 최종 합의 리포트</h2>
-                            <div className={styles.reportModalActions}>
-                                <button onClick={() => window.print()}>인쇄 / PDF 저장</button>
-                                <button onClick={() => setShowReportModal(false)}>닫기</button>
-                                <button
-                                    className={styles.dashboardBtn}
-                                    onClick={() => router.push('/dashboard')}
-                                >
-                                    ✅ 대시보드로 이동
-                                </button>
+                    <div className={styles.reportModalContent}>
+                        {reportLoading ? (
+                            <div className={styles.reportLoading}>
+                                <div className={styles.spinner}></div>
+                                <p>리포트 생성 중...</p>
                             </div>
-                        </div>
-                        <div className={styles.reportModalContent}>
-                            {reportLoading ? (
-                                <div className={styles.reportLoading}>
-                                    <div className={styles.spinner}></div>
-                                    <p>리포트 생성 중...</p>
-                                </div>
-                            ) : (
-                                <pre className={styles.reportText}>{reportContent}</pre>
-                            )}
-                        </div>
+                        ) : (
+                            <pre className={styles.reportText}>{reportContent}</pre>
+                        )}
                     </div>
                 </div>
-            )}
-        </main>
+            </div>
+        )
+    }
+        </main >
     )
 }

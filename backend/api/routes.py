@@ -36,6 +36,11 @@ from agents.legal_agent_judge import LegalAgentJudge
 from agents.legal_agent_claimant import LegalAgentClaimant
 from agents.legal_agent_opposing import LegalAgentOpposing
 from agents.legal_agent_verifier import LegalAgentVerifier
+# 개발 프로젝트 에이전트
+from agents.devproject.agent_prd import DevAgentPRD
+from agents.devproject.agent_tech import DevAgentTech
+from agents.devproject.agent_ux import DevAgentUX
+from agents.devproject.agent_dm import DevAgentDM
 from storage import supabase_client as db
 from .events import sse_event_manager, EventType
 from config import BASE_URL
@@ -63,12 +68,22 @@ legal_agents = {
     "verifier": LegalAgentVerifier(gemini_client),
 }
 
+# 개발 프로젝트 에이전트 인스턴스
+dev_agents = {
+    "prd": DevAgentPRD(gemini_client),
+    "tech": DevAgentTech(gemini_client),
+    "ux": DevAgentUX(gemini_client),
+    "dm": DevAgentDM(gemini_client),
+    "verifier": VerifierAgent(gemini_client), # 기존 Verifier 재사용 (또는 전용 Verifier 구현)
+}
+
 
 # Request/Response 모델
 class CreateSessionRequest(BaseModel):
     category: Optional[str] = None  # 일반 토론용 (레거시)
     topic: str
     case_type: Optional[str] = None  # 법무 시뮬레이션: "criminal" | "civil"
+    project_type: Optional[str] = "general"  # "general" | "legal" | "dev_project"
     user_id: Optional[str] = None
 
 
@@ -78,6 +93,7 @@ class CreateSessionResponse(BaseModel):
     topic: str
     status: str
     case_type: Optional[str] = None  # 법무 시뮬레이션: 'criminal' | 'civil'
+    project_type: str = "general"
 
 
 class UserMessageRequest(BaseModel):
@@ -104,6 +120,7 @@ class SessionResponse(BaseModel):
     round_index: int
     phase: str
     case_type: Optional[str] = None  # 법무 시뮬레이션: 'criminal' | 'civil'
+    project_type: str = "general"
 
 
 # Phase 실행 함수
@@ -127,6 +144,15 @@ async def execute_phase(session_id: str, phase: str, config: dict) -> str:
         return ""
     
     agent = agents.get(agent_name)
+    
+    # 2. 법무 시뮬레이션 에이전트 확인
+    if not agent:
+        agent = legal_agents.get(agent_name)
+        
+    # 3. 개발 프로젝트 에이전트 확인
+    if not agent:
+        agent = dev_agents.get(agent_name)
+        
     if not agent:
         logger.error(f"Agent not found: {agent_name}")
         return ""
@@ -367,14 +393,26 @@ async def execute_round(session_id: str, current_round: int):
         open_issues = case_file.get("open_issues", [])
         
         # ROUND_END 이벤트 발송 (게이트 데이터 포함)
-        await sse_event_manager.emit(session_id, EventType.ROUND_END, {
-            "round_index": current_round,
-            "phase": phase,
+        # ROUND_END 이벤트 발송 (게이트 데이터 포함 - 표준화된 페이로드 v2.1)
+        payload = {
+            "session_id": session_id,
+            "project_type": session.get("project_type", "general"),
+            "current_round": current_round,
+            "phase_completed": phase,
+            "round_index": current_round, # 호환성 유지
+            "phase": phase, # 호환성 유지
             "decision_summary": decisions[-1] if decisions else "진행 중...",
             "what_changed": [], # TODO: 변경점 추적 로직 추가 필요
-            "open_issues": open_issues[-3:],
-            "verifier_gate_status": gate_status or "Go"
-        })
+            "decisions_so_far": decisions,
+            "open_issues": open_issues[-5:],
+            "risks_top": case_file.get("risks_so_far", [])[-3:],
+            "recommended_focus_options": {"prd": "TBD", "ux": "TBD", "tech": "TBD"}, # 에이전트 제안 연동 필요
+            "steering_needed": True,
+            "steering_questions": [], # Pending 시 질문 채움
+            "verifier_gate_status": gate_status or "Go",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        await sse_event_manager.emit(session_id, EventType.ROUND_END, payload)
         
     else:
         # WAIT_USER (기존 로직 유지 - 하지만 v2.2에서는 USER_GATE를 주로 사용)
@@ -461,14 +499,15 @@ async def create_session_endpoint(request: CreateSessionRequest, background_task
         
         session_id = session_data["id"]
         
-        # 법무 시뮬레이션 vs 일반 토론 분기
-        if request.case_type:
+        # 법무 시뮬레이션 vs 개발 프로젝트 vs 일반 토론 분기
+        if request.case_type or request.project_type == "legal":
             # 법무 시뮬레이션: FACTS_INTAKE 단계로 시작
             await db.update_session(session_id, {
                 "round_index": 0,
                 "phase": Phase.FACTS_INTAKE.value,
                 "status": "active",
-                "case_type": request.case_type,
+                "case_type": request.case_type or "civil",
+                "project_type": "legal"
             })
             
             # CaseFile 초기화 (법무 필드 포함)
@@ -481,12 +520,36 @@ async def create_session_endpoint(request: CreateSessionRequest, background_task
             
             logger.info(f"[CreateSession] Legal session created: {session_id}, case_type={request.case_type}")
             
+        elif request.project_type == "dev_project":
+            # 개발 프로젝트: PRD_R1 단계로 시작 (또는 WAIT_USER 없이 바로 시작)
+            # v2.1: USER_GATE에서 시작하지 않고 바로 R1 시작
+            await db.update_session(session_id, {
+                "round_index": 1, # R1부터 시작
+                "phase": Phase.PRD_R1.value,
+                "status": "active",
+                "project_type": "dev_project"
+            })
+            
+            # CaseFile 초기화 (Dev Project 필드 포함)
+            await db.save_case_file(session_id, {
+                "facts": [], "goals": [], "constraints": [], "decisions": [], 
+                "open_issues": [], "assumptions": [], "next_experiments": [],
+                "decisions_so_far": [], "scope_in": [], "scope_out": [], "risks_so_far": [],
+                "ux_artifacts_summary": {}, "tech_artifacts_summary": {},
+                "steering_history": [], "committed_steering_snapshot": {}
+            })
+            
+            # 첫 번째 라운드 자동 시작
+            background_tasks.add_task(execute_round, session_id, 1)
+            logger.info(f"[CreateSession] Dev Project session created: {session_id}")
+
         else:
             # 일반 토론: 기존 로직
             await db.update_session(session_id, {
                 "round_index": 0,
                 "phase": Phase.WAIT_USER.value,
-                "status": "active"
+                "status": "active",
+                "project_type": "general"
             })
             
             # CaseFile 초기화 (기존 스키마 필드만 사용)
@@ -503,7 +566,8 @@ async def create_session_endpoint(request: CreateSessionRequest, background_task
             category=session_data.get("category"),
             topic=session_data["topic"],
             status="active",
-            case_type=request.case_type
+            case_type=request.case_type,
+            project_type=request.project_type or "general"
         )
         
     except Exception as e:

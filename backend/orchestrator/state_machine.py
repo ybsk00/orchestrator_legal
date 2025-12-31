@@ -79,6 +79,25 @@ class Phase(str, Enum):
     END_GATE = "END_GATE"    # 최종 종료 전 대기
     FINALIZE_DONE = "FINALIZE_DONE"
 
+    # === 개발 프로젝트 전용 Phase (v2.1) ===
+    # Round 1 (Define)
+    PRD_R1 = "PRD_R1"
+    UX_R1 = "UX_R1"
+    TECH_R1 = "TECH_R1"
+    DM_R1 = "DM_R1"
+    
+    # Round 2 (Risk & Tradeoff)
+    TECH_R2 = "TECH_R2"
+    UX_R2 = "UX_R2"
+    PRD_R2 = "PRD_R2"
+    DM_R2 = "DM_R2"
+    
+    # Round 3 (Commit)
+    DM_R3 = "DM_R3"
+    TECH_R3 = "TECH_R3"
+    UX_R3 = "UX_R3"
+    VERIFIER_R3 = "VERIFIER_R3"
+
 
 # ==========================================
 # 일반 토론용 전이 테이블 (기존)
@@ -218,32 +237,119 @@ LEGAL_PHASE_TO_ROUND = {
 
 
 # ==========================================
+# 개발 프로젝트 전용 전이 테이블 (v2.1)
+# ==========================================
+DEV_PROJECT_PHASE_TRANSITIONS = {
+    # Round 1: PRD -> UX -> TECH -> DM -> USER_GATE
+    Phase.PRD_R1: Phase.UX_R1,
+    Phase.UX_R1: Phase.TECH_R1,
+    Phase.TECH_R1: Phase.DM_R1,
+    Phase.DM_R1: Phase.USER_GATE,
+    
+    # Round 2: TECH -> UX -> PRD -> DM -> USER_GATE
+    Phase.TECH_R2: Phase.UX_R2,
+    Phase.UX_R2: Phase.PRD_R2,
+    Phase.PRD_R2: Phase.DM_R2,
+    Phase.DM_R2: Phase.USER_GATE,
+    
+    # Round 3: DM -> TECH -> UX -> VERIFIER -> END_GATE
+    Phase.DM_R3: Phase.TECH_R3,
+    Phase.TECH_R3: Phase.UX_R3,
+    Phase.UX_R3: Phase.VERIFIER_R3,
+    Phase.VERIFIER_R3: Phase.END_GATE,
+}
+
+
+# 개발 프로젝트 라운드별 시작 phase
+DEV_PROJECT_ROUND_START_PHASE = {
+    1: Phase.PRD_R1,
+    2: Phase.TECH_R2,
+    3: Phase.DM_R3,
+}
+
+
+# 개발 프로젝트 Phase별 담당 에이전트
+DEV_PROJECT_PHASE_TO_AGENT = {
+    Phase.PRD_R1: "prd",
+    Phase.UX_R1: "ux",
+    Phase.TECH_R1: "tech",
+    Phase.DM_R1: "dm",
+    Phase.TECH_R2: "tech",
+    Phase.UX_R2: "ux",
+    Phase.PRD_R2: "prd",
+    Phase.DM_R2: "dm",
+    Phase.DM_R3: "dm",
+    Phase.TECH_R3: "tech",
+    Phase.UX_R3: "ux",
+    Phase.VERIFIER_R3: "verifier",
+}
+
+
+# 개발 프로젝트 Phase별 라운드 번호
+DEV_PROJECT_PHASE_TO_ROUND = {
+    Phase.PRD_R1: 1,
+    Phase.UX_R1: 1,
+    Phase.TECH_R1: 1,
+    Phase.DM_R1: 1,
+    Phase.TECH_R2: 2,
+    Phase.UX_R2: 2,
+    Phase.PRD_R2: 2,
+    Phase.DM_R2: 2,
+    Phase.DM_R3: 3,
+    Phase.TECH_R3: 3,
+    Phase.UX_R3: 3,
+    Phase.VERIFIER_R3: 3,
+}
+
+
+# ==========================================
 # 일반 토론용 함수
 # ==========================================
-def get_next_phase(current_phase: str, gate_status: Optional[str] = None) -> str:
+def get_next_phase(
+    current_phase: str, 
+    project_type: str = "general",
+    gate_status: Optional[str] = None,
+    case_type: Optional[str] = None,
+    missing_facts_count: int = 0
+) -> str:
     """
-    현재 phase에서 다음 phase를 반환합니다.
+    현재 phase에서 다음 phase를 반환합니다. (통합 함수)
     
     Args:
         current_phase: 현재 phase 문자열
-        gate_status: Verifier gate 상태 ("Go", "Conditional", "No-Go")
-    
-    Returns:
-        다음 phase 문자열. Unknown이면 FINALIZE_DONE 안전 복귀.
+        project_type: 프로젝트 유형 ("general", "legal", "dev_project")
+        gate_status: Verifier gate 상태
+        case_type: 법무 시뮬레이션 사건 유형
+        missing_facts_count: 법무 Facts 단계 분기용
     """
-    # No-Go면 즉시 종료
-    if gate_status == "No-Go":
-        logger.info("Gate status is No-Go, forcing FINALIZE_DONE")
-        return Phase.FINALIZE_DONE.value
-    
-    # Phase enum으로 변환 시도
+    # 법무 시뮬레이션 처리
+    if project_type == "legal":
+        return get_next_phase_legal(current_phase, case_type, gate_status, missing_facts_count)
+        
+    # Phase enum 변환
     try:
         phase_enum = Phase(current_phase)
     except ValueError:
         logger.error(f"Unknown phase: {current_phase}, forcing FINALIZE_DONE")
         return Phase.FINALIZE_DONE.value
+
+    # 개발 프로젝트 처리
+    if project_type == "dev_project":
+        next_phase = DEV_PROJECT_PHASE_TRANSITIONS.get(phase_enum)
+        if next_phase is None:
+            # USER_GATE나 END_GATE 등 전이가 없는 상태일 수 있음
+            if phase_enum in [Phase.USER_GATE, Phase.END_GATE]:
+                return phase_enum.value
+            logger.error(f"No dev_project transition for phase: {current_phase}, forcing END_GATE")
+            return Phase.END_GATE.value
+        return next_phase.value
+
+    # 일반 토론 처리 (기본)
+    # No-Go면 즉시 종료
+    if gate_status == "No-Go":
+        logger.info("Gate status is No-Go, forcing FINALIZE_DONE")
+        return Phase.FINALIZE_DONE.value
     
-    # 전이 테이블에서 다음 phase 조회
     next_phase = PHASE_TRANSITIONS.get(phase_enum)
     
     if next_phase is None:
@@ -253,16 +359,14 @@ def get_next_phase(current_phase: str, gate_status: Optional[str] = None) -> str
     return next_phase.value
 
 
-def get_round_start_phase(round_number: int) -> Optional[str]:
-    """
-    라운드 시작 phase를 반환합니다.
-    
-    Args:
-        round_number: 라운드 번호 (1, 2, 3)
-    
-    Returns:
-        해당 라운드의 시작 phase. 범위 초과시 None.
-    """
+def get_round_start_phase(round_number: int, project_type: str = "general") -> Optional[str]:
+    """라운드 시작 phase 반환 (프로젝트 타입 지원)"""
+    if project_type == "legal":
+        return get_legal_round_start_phase(round_number)
+    elif project_type == "dev_project":
+        phase = DEV_PROJECT_ROUND_START_PHASE.get(round_number)
+        return phase.value if phase else None
+        
     phase = ROUND_START_PHASE.get(round_number)
     return phase.value if phase else None
 
@@ -271,7 +375,20 @@ def get_agent_for_phase(phase: str) -> Optional[str]:
     """해당 phase를 담당하는 에이전트 이름을 반환합니다."""
     try:
         phase_enum = Phase(phase)
-        return PHASE_TO_AGENT.get(phase_enum)
+        
+        # 1. 일반 토론
+        if agent := PHASE_TO_AGENT.get(phase_enum):
+            return agent
+            
+        # 2. 법무 시뮬레이션
+        if agent := LEGAL_PHASE_TO_AGENT.get(phase_enum):
+            return agent
+            
+        # 3. 개발 프로젝트
+        if agent := DEV_PROJECT_PHASE_TO_AGENT.get(phase_enum):
+            return agent
+            
+        return None
     except ValueError:
         return None
 
@@ -280,7 +397,20 @@ def get_round_for_phase(phase: str) -> Optional[int]:
     """해당 phase가 속한 라운드 번호를 반환합니다."""
     try:
         phase_enum = Phase(phase)
-        return PHASE_TO_ROUND.get(phase_enum)
+        
+        # 1. 일반 토론
+        if round_num := PHASE_TO_ROUND.get(phase_enum):
+            return round_num
+            
+        # 2. 법무 시뮬레이션
+        if round_num := LEGAL_PHASE_TO_ROUND.get(phase_enum):
+            return round_num
+            
+        # 3. 개발 프로젝트
+        if round_num := DEV_PROJECT_PHASE_TO_ROUND.get(phase_enum):
+            return round_num
+            
+        return None
     except ValueError:
         return None
 
@@ -377,6 +507,16 @@ def is_legal_phase(phase: str) -> bool:
         Phase.OPPOSING_R3.value, Phase.CLAIMANT_R3.value, Phase.JUDGE_R3.value, Phase.VERIFIER_R3.value,
     ]
     return phase in legal_phases
+
+
+def is_dev_project_phase(phase: str) -> bool:
+    """개발 프로젝트 phase인지 확인."""
+    dev_phases = [
+        Phase.PRD_R1.value, Phase.UX_R1.value, Phase.TECH_R1.value, Phase.DM_R1.value,
+        Phase.TECH_R2.value, Phase.UX_R2.value, Phase.PRD_R2.value, Phase.DM_R2.value,
+        Phase.DM_R3.value, Phase.TECH_R3.value, Phase.UX_R3.value, Phase.VERIFIER_R3.value,
+    ]
+    return phase in dev_phases
 
 
 class StateMachine:

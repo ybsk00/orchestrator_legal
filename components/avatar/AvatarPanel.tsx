@@ -6,126 +6,31 @@ import styles from './AvatarPanel.module.css'
 
 const WaveBackground = dynamic(() => import('@/components/ui/WaveBackground'), { ssr: false })
 
-interface AvatarPanelProps {
-    activeSpeaker: string | null
-}
-
-interface AgentCardProps {
-    agentId: string
+interface AgentConfig {
+    id: string
     name: string
     role: string
-    isSpeaking: boolean
     colorTheme: 'blue' | 'orange' | 'purple' | 'red'
 }
 
-function AgentCard({ agentId, name, role, isSpeaking, colorTheme }: AgentCardProps) {
-    const videoRef = useRef<HTMLVideoElement>(null)
-    const [videoError, setVideoError] = useState(false)
-    const [isLoading, setIsLoading] = useState(true)
-
-    const videoSrc = isSpeaking ? '/Talk.mp4' : '/Idle.mp4'
-
-    useEffect(() => {
-        const video = videoRef.current
-        if (!video) return
-
-        // 영상 소스 변경 시 자연스럽게 전환
-        const currentTime = video.currentTime
-        video.src = videoSrc
-        video.load()
-        video.play().catch(() => {
-            setVideoError(true)
-        })
-    }, [videoSrc])
-
-    const handleVideoLoad = () => {
-        setIsLoading(false)
-        setVideoError(false)
-    }
-
-    const handleVideoError = () => {
-        setVideoError(true)
-        setIsLoading(false)
-    }
-
-    return (
-        <div
-            className={`
-        ${styles.agentCard} 
-        ${styles[colorTheme]} 
-        ${isSpeaking ? styles.speaking : ''}
-      `}
-        >
-            {/* 에이전트 이름 */}
-            <div className={styles.cardHeader}>
-                <span className={styles.agentName}>{name}</span>
-                <span className={styles.agentRole}>{role}</span>
-            </div>
-
-            {/* 비디오 영역 */}
-            <div className={styles.videoContainer}>
-                {isLoading && (
-                    <div className={styles.loadingPlaceholder}>
-                        <img
-                            src="/avatar.png"
-                            alt={name}
-                            className={styles.fallbackImage}
-                            onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none'
-                            }}
-                        />
-                    </div>
-                )}
-
-                {videoError ? (
-                    <div className={styles.fallback}>
-                        <img
-                            src="/avatar.png"
-                            alt={name}
-                            className={styles.fallbackImage}
-                            onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none'
-                            }}
-                        />
-                        <span className={styles.errorText}>Video load failed</span>
-                    </div>
-                ) : (
-                    <video
-                        ref={videoRef}
-                        className={styles.video}
-                        src={videoSrc}
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        onLoadedData={handleVideoLoad}
-                        onError={handleVideoError}
-                    />
-                )}
-            </div>
-
-            {/* 상태 라벨 */}
-            <div className={styles.statusLabel}>
-                {isSpeaking ? (
-                    <span className={styles.speakingStatus}>● Speaking</span>
-                ) : (
-                    <span className={styles.idleStatus}>○ Idle</span>
-                )}
-            </div>
-        </div>
-    )
+interface AvatarPanelProps {
+    activeSpeaker: string | null
+    agents?: AgentConfig[]
 }
 
-export default function AvatarPanel({ activeSpeaker }: AvatarPanelProps) {
-    const agents = [
-        { id: 'agent1', name: 'Agent 1', role: 'Planner', colorTheme: 'blue' as const },
-        { id: 'agent2', name: 'Agent 2', role: 'Critic', colorTheme: 'orange' as const },
-        { id: 'agent3', name: 'Agent 3', role: 'Synthesizer', colorTheme: 'purple' as const },
-        { id: 'verifier', name: 'Verifier', role: 'Verifier', colorTheme: 'red' as const },
+export default function AvatarPanel({ activeSpeaker, agents: customAgents }: AvatarPanelProps) {
+    const defaultAgents: AgentConfig[] = [
+        { id: 'agent1', name: 'Agent 1', role: 'Planner', colorTheme: 'blue' },
+        { id: 'agent2', name: 'Agent 2', role: 'Critic', colorTheme: 'orange' },
+        { id: 'agent3', name: 'Agent 3', role: 'Synthesizer', colorTheme: 'purple' },
+        { id: 'verifier', name: 'Verifier', role: 'Verifier', colorTheme: 'red' },
     ]
 
-    const topAgents = agents.filter(a => ['agent1', 'agent2'].includes(a.id))
-    const bottomAgents = agents.filter(a => ['agent3', 'verifier'].includes(a.id))
+    const agents = customAgents || defaultAgents
+
+    // 4인 그리드 레이아웃 (2x2)
+    const topAgents = agents.slice(0, 2)
+    const bottomAgents = agents.slice(2, 4)
 
     return (
         <div className={styles.avatarPanel}>

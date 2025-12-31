@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import ReactMarkdown from 'react-markdown'
 import styles from './page.module.css'
 
 export default function ReportPage() {
@@ -81,7 +82,13 @@ export default function ReportPage() {
                 </div>
             </header>
             <main className={styles.reportContent}>
-                <pre className={styles.preContent}>{report || ''}</pre>
+                <div className={styles.markdownWrapper}>
+                    {report ? (
+                        <ReactMarkdown>{report}</ReactMarkdown>
+                    ) : (
+                        <p>리포트 내용이 없습니다.</p>
+                    )}
+                </div>
             </main>
         </div>
     )

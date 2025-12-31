@@ -40,6 +40,18 @@ class CaseFile(BaseModel):
     criticisms_so_far: List[str] = Field(default_factory=list)
     criticisms_last_round: List[str] = Field(default_factory=list)
     
+    # 개발 프로젝트 전용 필드 (v2.1)
+    decisions_so_far: List[str] = Field(default_factory=list, description="누적 결정사항")
+    scope_in: List[str] = Field(default_factory=list, description="In-Scope")
+    scope_out: List[str] = Field(default_factory=list, description="Out-Scope")
+    risks_so_far: List[str] = Field(default_factory=list, description="누적 리스크")
+    
+    ux_artifacts_summary: Dict[str, Any] = Field(default_factory=dict, description="UX 산출물 요약")
+    tech_artifacts_summary: Dict[str, Any] = Field(default_factory=dict, description="Tech 산출물 요약")
+    
+    steering_history: List[Dict[str, Any]] = Field(default_factory=list, description="Steering 이력")
+    committed_steering_snapshot: Dict[str, Any] = Field(default_factory=dict, description="현재 적용된 Steering")
+    
     def get_summary(self, max_chars: int = CASEFILE_MAX_CHARS) -> str:
         """
         CaseFile 요약 (권장 800~1200자)

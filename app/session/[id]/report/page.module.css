@@ -45,26 +45,6 @@
     border-color: #ccc;
 }
 
-.reportContent {
-    font-size: 1.1rem;
-}
-
-.preContent {
-    white-space: pre-wrap;
-    font-family: inherit;
-    color: #333;
-    background: #f9f9f9;
-    padding: 1.5rem;
-    border-radius: 8px;
-    border: 1px solid #eee;
-}
-
-.loading,
-.error {
-    text-align: center;
-    padding-top: 5rem;
-}
-
 .spinner {
     width: 40px;
     height: 40px;
