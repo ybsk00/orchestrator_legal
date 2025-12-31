@@ -372,7 +372,7 @@ async def execute_round(session_id: str, current_round: int):
         result = await execute_phase(session_id, phase, config)
         
         # API Rate Limit 방지를 위한 딜레이 (Gemini 429 에러 방지)
-        await asyncio.sleep(3)
+        await asyncio.sleep(5)
         
         # Verifier gate 결과 추출
         if "V_R2_GATE" in phase or "V_R3_SIGNOFF" in phase or "V_R1_AUDIT" in phase or "VERIFIER" in phase:
@@ -1176,19 +1176,6 @@ async def execute_legal_round(session_id: str, round_number: int):
         if agent_name and agent_name != "system":
             # 에이전트 실행
             result = await execute_legal_phase(session_id, phase, agent_name, round_number)
-            
-            # Verifier에서 gate_status 추출
-            if "VERIFIER" in phase:
-                gate_status = extract_gate_status(result)
-            
-            # API Rate Limit 방지
-            await asyncio.sleep(3)
-        
-        # 다음 phase 결정
-        phase = get_next_phase_legal(phase, case_type, gate_status)
-    
-    # 라운드 종료 처리
-    await db.update_session(session_id, {"phase": phase})
     
     # ROUND_END 이벤트 발송
     case_file = await db.get_case_file(session_id)

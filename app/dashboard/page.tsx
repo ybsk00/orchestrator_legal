@@ -560,16 +560,22 @@ export default function DashboardPage() {
                                         </div>
                                     </div>
                                 ) : mode === 'dev_project' ? (
-                                    /* 개발 프로젝트: 별도 옵션 없음 (추후 추가 가능) */
+                                    /* 개발 프로젝트: 4인 전문가 카드 표시 */
                                     <div className={styles.formGroup}>
-                                        <div className={styles.infoBox}>
-                                            <p>💡 <strong>4인의 전문가 에이전트</strong>가 참여합니다.</p>
-                                            <ul>
-                                                <li>Product Manager (기획)</li>
-                                                <li>Tech Lead (기술)</li>
-                                                <li>UX Lead (디자인)</li>
-                                                <li>Delivery Manager (일정)</li>
-                                            </ul>
+                                        <label>참여 전문가 (4인)</label>
+                                        <div className={styles.categoryOptions}>
+                                            {[
+                                                { role: 'prd', label: 'Product Manager', icon: '📝', desc: '기획' },
+                                                { role: 'tech', label: 'Tech Lead', icon: '💻', desc: '기술' },
+                                                { role: 'ux', label: 'UX Lead', icon: '🎨', desc: '디자인' },
+                                                { role: 'dm', label: 'Delivery Manager', icon: '📅', desc: '일정' },
+                                            ].map(agent => (
+                                                <div key={agent.role} className={`${styles.categoryOption} ${styles.selected}`}>
+                                                    <span className={styles.categoryIcon}>{agent.icon}</span>
+                                                    <span className={styles.categoryLabel}>{agent.label}</span>
+                                                    <span style={{ fontSize: '0.8rem', color: '#888' }}>{agent.desc}</span>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 ) : (
