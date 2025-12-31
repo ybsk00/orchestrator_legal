@@ -210,8 +210,8 @@ User note: {steering.get('free_text', '')}
     # 프롬프트 구성 (Steering Block은 BaseAgent 내부에서 처리)
     prompt = agent.system_prompt
     prompt = prompt.replace("{{max_chars}}", str(config.get("max_chars", 300)))
-    prompt = prompt.replace("{{category}}", session_data.get("category", "general"))
-    prompt = prompt.replace("{{topic}}", session_data.get("topic", ""))
+    prompt = prompt.replace("{{category}}", session_data.get("category") or "general")
+    prompt = prompt.replace("{{topic}}", session_data.get("topic") or "")
     prompt = prompt.replace("{{case_file_summary}}", case_file_summary)
     prompt = prompt.replace("{{criticisms_last_round}}", criticisms_last_round)
     
