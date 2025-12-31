@@ -11,11 +11,11 @@ type CaseType = 'criminal' | 'civil' | ''
 type Mode = 'general' | 'legal' | 'dev_project'
 
 const CATEGORIES: { value: Category; label: string; icon: string }[] = [
-    { value: '', label: '전체', icon: '📋' },
+    { value: '', label: '전체 목록', icon: '📋' },
     { value: 'newbiz', label: '신규사업', icon: '🚀' },
     { value: 'marketing', label: '마케팅', icon: '📈' },
     { value: 'dev', label: '개발', icon: '💻' },
-    { value: 'domain', label: '영역', icon: '🏢' },
+    { value: 'domain', label: '운영', icon: '🏢' },
 ]
 
 const CASE_TYPES: { value: CaseType; label: string; icon: string; desc: string }[] = [
@@ -283,7 +283,7 @@ export default function DashboardPage() {
                 </nav>
 
                 <div className={styles.sidebarSection}>
-                    <h4 className={styles.sidebarLabel}>카테고리 필터</h4>
+                    <h4 className={styles.sidebarLabel}>일반 프로젝트</h4>
                     <div className={styles.filterList}>
                         {CATEGORIES.map(cat => (
                             <button
@@ -323,7 +323,7 @@ export default function DashboardPage() {
                             }}
                         >
                             <span>💻</span>
-                            <span>프로젝트 목록</span>
+                            <span>전체 목록</span>
                             <span className={styles.filterCount}>
                                 {sessions.filter(s => s.category === 'dev').length}
                             </span>
@@ -333,14 +333,14 @@ export default function DashboardPage() {
 
                 {/* 법무 필터 섹션 */}
                 <div className={styles.sidebarSection}>
-                    <h4 className={styles.sidebarLabel}>법무 필터</h4>
+                    <h4 className={styles.sidebarLabel}>법무</h4>
                     <div className={styles.filterList}>
                         <button
                             className={`${styles.filterItem} ${filterCaseType === '' ? styles.active : ''}`}
                             onClick={() => setFilterCaseType('')}
                         >
                             <span>⚖️</span>
-                            <span>전체</span>
+                            <span>전체 목록</span>
                             <span className={styles.filterCount}>
                                 {sessions.filter(s => s.case_type).length}
                             </span>
