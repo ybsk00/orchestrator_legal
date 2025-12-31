@@ -7,6 +7,7 @@ import Link from 'next/link'
 import styles from './page.module.css'
 
 type Category = 'newbiz' | 'marketing' | 'dev' | 'domain' | ''
+type CaseType = 'criminal' | 'civil' | ''
 
 const CATEGORIES: { value: Category; label: string; icon: string }[] = [
     { value: '', label: '전체', icon: '📋' },
@@ -14,6 +15,11 @@ const CATEGORIES: { value: Category; label: string; icon: string }[] = [
     { value: 'marketing', label: '마케팅', icon: '📈' },
     { value: 'dev', label: '개발', icon: '💻' },
     { value: 'domain', label: '영역', icon: '🏢' },
+]
+
+const CASE_TYPES: { value: CaseType; label: string; icon: string; desc: string }[] = [
+    { value: 'criminal', label: '형사사건', icon: '⚖️', desc: '검사 vs 변호인 모의 재판' },
+    { value: 'civil', label: '민사사건', icon: '📋', desc: '원고 vs 피고 법적 분쟁' },
 ]
 
 const DATE_FILTERS = [
@@ -27,6 +33,7 @@ interface Session {
     id: string
     topic: string
     category: Category
+    case_type?: CaseType
     status: string
     created_at: string
 }
@@ -36,6 +43,7 @@ const ITEMS_PER_PAGE = 10
 export default function DashboardPage() {
     const [sessions, setSessions] = useState<Session[]>([])
     const [category, setCategory] = useState<Category>('')
+    const [caseType, setCaseType] = useState<CaseType>('')
     const [topic, setTopic] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [user, setUser] = useState<any>(null)
@@ -45,6 +53,7 @@ export default function DashboardPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [activeTab, setActiveTab] = useState<'new' | 'history'>('history')
     const [currentPage, setCurrentPage] = useState(1)
+    const [isLegalMode, setIsLegalMode] = useState(false)  // 법무 시뮬레이션 모드
     const router = useRouter()
     const supabase = createClient()
 
@@ -124,6 +133,31 @@ export default function DashboardPage() {
     }, [filterCategory, filterDate, searchQuery])
 
     const handleStartSession = async () => {
+        // 법무 시뮬레이션 모드
+        if (isLegalMode) {
+            if (!caseType || !topic.trim()) return
+
+            setIsLoading(true)
+            try {
+                const response = await fetch('/api/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ case_type: caseType, topic, user_id: user?.id }),
+                })
+
+                if (response.ok) {
+                    const data = await response.json()
+                    router.push(`/session/${data.session_id}`)
+                }
+            } catch (error) {
+                console.error('Failed to create legal session:', error)
+            } finally {
+                setIsLoading(false)
+            }
+            return
+        }
+
+        // 일반 토론 모드
         if (!category || !topic.trim()) return
 
         setIsLoading(true)
@@ -395,29 +429,72 @@ export default function DashboardPage() {
                         <div className={styles.newSessionForm}>
                             <div className={styles.formCard}>
                                 <h2>새로운 AI 회의 시작</h2>
-                                <p className={styles.formDesc}>카테고리와 주제를 선택하여 AI 에이전트들과의 협업 회의를 시작하세요.</p>
+                                <p className={styles.formDesc}>
+                                    {isLegalMode
+                                        ? '법무 시뮬레이션으로 모의 재판을 진행합니다.'
+                                        : 'AI 에이전트들과의 협업 회의를 시작하세요.'}
+                                </p>
 
-                                <div className={styles.formGroup}>
-                                    <label>카테고리 선택</label>
-                                    <div className={styles.categoryOptions}>
-                                        {CATEGORIES.filter(c => c.value !== '').map(cat => (
-                                            <button
-                                                key={cat.value}
-                                                className={`${styles.categoryOption} ${category === cat.value ? styles.selected : ''}`}
-                                                onClick={() => setCategory(cat.value)}
-                                            >
-                                                <span className={styles.categoryIcon}>{cat.icon}</span>
-                                                <span className={styles.categoryLabel}>{cat.label}</span>
-                                            </button>
-                                        ))}
-                                    </div>
+                                {/* 모드 선택 */}
+                                <div className={styles.modeToggle}>
+                                    <button
+                                        className={`${styles.modeBtn} ${!isLegalMode ? styles.active : ''}`}
+                                        onClick={() => setIsLegalMode(false)}
+                                    >
+                                        🤖 일반 토론
+                                    </button>
+                                    <button
+                                        className={`${styles.modeBtn} ${isLegalMode ? styles.active : ''}`}
+                                        onClick={() => setIsLegalMode(true)}
+                                    >
+                                        ⚖️ 법무 시뮬레이션
+                                    </button>
                                 </div>
 
+                                {isLegalMode ? (
+                                    /* 법무 시뮬레이션: 사건 유형 선택 */
+                                    <div className={styles.formGroup}>
+                                        <label>사건 유형 선택</label>
+                                        <div className={styles.categoryOptions}>
+                                            {CASE_TYPES.map(ct => (
+                                                <button
+                                                    key={ct.value}
+                                                    className={`${styles.categoryOption} ${caseType === ct.value ? styles.selected : ''}`}
+                                                    onClick={() => setCaseType(ct.value)}
+                                                >
+                                                    <span className={styles.categoryIcon}>{ct.icon}</span>
+                                                    <span className={styles.categoryLabel}>{ct.label}</span>
+                                                    <span className={styles.caseDesc}>{ct.desc}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    /* 일반 토론: 카테고리 선택 */
+                                    <div className={styles.formGroup}>
+                                        <label>카테고리 선택</label>
+                                        <div className={styles.categoryOptions}>
+                                            {CATEGORIES.filter(c => c.value !== '').map(cat => (
+                                                <button
+                                                    key={cat.value}
+                                                    className={`${styles.categoryOption} ${category === cat.value ? styles.selected : ''}`}
+                                                    onClick={() => setCategory(cat.value)}
+                                                >
+                                                    <span className={styles.categoryIcon}>{cat.icon}</span>
+                                                    <span className={styles.categoryLabel}>{cat.label}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className={styles.formGroup}>
-                                    <label>토론 주제</label>
+                                    <label>{isLegalMode ? '사건 주제' : '토론 주제'}</label>
                                     <textarea
                                         className={styles.topicTextarea}
-                                        placeholder="예: 'AI 기반 고객 상담 챗봇 도입을 고려하고 있습니다. MVP 범위와 일정을 논의해주세요.'"
+                                        placeholder={isLegalMode
+                                            ? "예: '계약 위반으로 인한 손해배상 청구 사건을 시뮬레이션 해주세요.'"
+                                            : "예: 'AI 기반 고객 상담 챗봇 도입을 고려하고 있습니다. MVP 범위와 일정을 논의해주세요.'"}
                                         value={topic}
                                         onChange={(e) => setTopic(e.target.value)}
                                         rows={5}
@@ -427,9 +504,9 @@ export default function DashboardPage() {
                                 <button
                                     className={styles.startBtn}
                                     onClick={handleStartSession}
-                                    disabled={!category || !topic.trim() || isLoading}
+                                    disabled={(isLegalMode ? !caseType : !category) || !topic.trim() || isLoading}
                                 >
-                                    {isLoading ? '생성 중...' : '🚀 토론 시작하기'}
+                                    {isLoading ? '생성 중...' : isLegalMode ? '⚖️ 시뮬레이션 시작' : '🚀 토론 시작하기'}
                                 </button>
                             </div>
                         </div>

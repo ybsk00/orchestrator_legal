@@ -2,7 +2,7 @@
 CaseFile 모델 - 누적 메모리 (세션 컨텍스트)
 """
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 from config import CASEFILE_MAX_CHARS
@@ -24,6 +24,21 @@ class CaseFile(BaseModel):
     assumptions: List[str] = Field(default_factory=list, description="가정")
     next_experiments: List[str] = Field(default_factory=list, description="검증 실험")
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # 법무 시뮬레이션 전용 필드 - Facts Stipulation
+    confirmed_facts: List[str] = Field(default_factory=list, description="확정된 사실 (증거/합의)")
+    disputed_facts: List[str] = Field(default_factory=list, description="다툼/쟁점 사실")
+    missing_facts_questions: List[str] = Field(default_factory=list, description="누락 사실 질문")
+    case_overview: Optional[str] = Field(default=None, description="사건 개요")
+    parties: List[str] = Field(default_factory=list, description="당사자")
+    
+    # 법무 시뮬레이션 전용 필드 - Legal Steering (USER_GATE 입력)
+    legal_steering: Optional[Dict[str, Any]] = Field(default=None, description="법무 Steering 데이터")
+    # 예: {focus_issue, goal, constraints, stance, exclusions, notes, proof_priority, evidence_level}
+    
+    # 이전 라운드 비판 태그 (기존 호환)
+    criticisms_so_far: List[str] = Field(default_factory=list)
+    criticisms_last_round: List[str] = Field(default_factory=list)
     
     def get_summary(self, max_chars: int = CASEFILE_MAX_CHARS) -> str:
         """

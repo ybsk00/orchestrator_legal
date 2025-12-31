@@ -1,0 +1,10 @@
+# 법무 시뮬레이션용 에이전트 모듈
+from .role_prompts import (
+    LEGAL_STEERING_BLOCK,
+    JUDGE_R1_FRAME_PROMPT,
+    JUDGE_R2_PROMPT,
+    JUDGE_R3_PROMPT,
+    CLAIMANT_PROMPT,
+    OPPOSING_PROMPT,
+    VERIFIER_LEGAL_PROMPT,
+)

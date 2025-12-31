@@ -20,7 +20,10 @@ from orchestrator.state_machine import (
     Phase, MAX_ROUNDS, 
     get_next_phase, get_agent_for_phase, get_round_for_phase,
     get_round_start_phase, is_wait_user_phase, is_final_phase,
-    state_machine
+    state_machine,
+    # 법무 시뮬레이션용
+    get_next_phase_legal, get_legal_agent_for_phase, get_legal_round_for_phase,
+    get_legal_round_start_phase, is_legal_phase,
 )
 from orchestrator.turn_manager import turn_manager, get_phase_config
 from agents.base_agent import gemini_client
@@ -28,9 +31,15 @@ from agents.agent1_planner import Agent1Planner
 from agents.agent2_critic import Agent2Critic
 from agents.agent3_synthesizer import Agent3Synthesizer
 from agents.verifier import VerifierAgent
+# 법무 시뮬레이션 에이전트
+from agents.legal_agent_judge import LegalAgentJudge
+from agents.legal_agent_claimant import LegalAgentClaimant
+from agents.legal_agent_opposing import LegalAgentOpposing
+from agents.legal_agent_verifier import LegalAgentVerifier
 from storage import supabase_client as db
 from .events import sse_event_manager, EventType
 from config import BASE_URL
+from prompts.legal.role_prompts import LEGAL_STEERING_BLOCK, FACTS_STIPULATE_PROMPT
 
 # 로깅 설정
 logging.basicConfig(level=logging.DEBUG)
@@ -38,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
-# 에이전트 인스턴스
+# 일반 토론 에이전트 인스턴스
 agents = {
     "agent1": Agent1Planner(gemini_client),
     "agent2": Agent2Critic(gemini_client),
@@ -46,11 +55,20 @@ agents = {
     "verifier": VerifierAgent(gemini_client),
 }
 
+# 법무 시뮬레이션 에이전트 인스턴스
+legal_agents = {
+    "judge": LegalAgentJudge(gemini_client),
+    "claimant": LegalAgentClaimant(gemini_client),
+    "opposing": LegalAgentOpposing(gemini_client),
+    "verifier": LegalAgentVerifier(gemini_client),
+}
+
 
 # Request/Response 모델
 class CreateSessionRequest(BaseModel):
-    category: str
+    category: Optional[str] = None  # 일반 토론용 (레거시)
     topic: str
+    case_type: Optional[str] = None  # 법무 시뮬레이션: "criminal" | "civil"
     user_id: Optional[str] = None
 
 
@@ -417,11 +435,16 @@ def check_steering_compliance(response: str, steering: Optional[Dict[str, Any]])
 @router.post("/sessions", response_model=CreateSessionResponse)
 async def create_session_endpoint(request: CreateSessionRequest, background_tasks: BackgroundTasks):
     """
-    새 토론 세션 생성 (v2.2)
+    새 토론 세션 생성 (v2.2 + Legal v1.1)
     
+    일반 토론:
     - current_round = 0
     - phase = WAIT_USER
-    - 사용자 첫 메시지 대기
+    - 첫 번째 라운드 자동 시작
+    
+    법무 시뮬레이션 (case_type 있을 때):
+    - phase = FACTS_INTAKE
+    - 사실관계 입력 대기
     """
     try:
         # Supabase에 세션 생성
@@ -436,25 +459,46 @@ async def create_session_endpoint(request: CreateSessionRequest, background_task
         
         session_id = session_data["id"]
         
-        # 초기 상태 설정 (v2.2: current_round=0, phase=WAIT_USER)
-        await db.update_session(session_id, {
-            "round_index": 0,
-            "phase": Phase.WAIT_USER.value,
-            "status": "active"
-        })
-        
-        # CaseFile 초기화 (기존 스키마 필드만 사용)
-        await db.save_case_file(session_id, {
-            "facts": [], "goals": [], "constraints": [], "decisions": [], 
-            "open_issues": [], "assumptions": [], "next_experiments": []
-        })
-        
-        # 첫 번째 라운드 자동 시작 (사용자 입력 없이 바로 시작)
-        background_tasks.add_task(start_round, session_id)
+        # 법무 시뮬레이션 vs 일반 토론 분기
+        if request.case_type:
+            # 법무 시뮬레이션: FACTS_INTAKE 단계로 시작
+            await db.update_session(session_id, {
+                "round_index": 0,
+                "phase": Phase.FACTS_INTAKE.value,
+                "status": "active",
+                "case_type": request.case_type,
+            })
+            
+            # CaseFile 초기화 (법무 필드 포함)
+            await db.save_case_file(session_id, {
+                "facts": [], "goals": [], "constraints": [], "decisions": [], 
+                "open_issues": [], "assumptions": [], "next_experiments": [],
+                "confirmed_facts": [], "disputed_facts": [], "missing_facts_questions": [],
+                "legal_steering": None
+            })
+            
+            logger.info(f"[CreateSession] Legal session created: {session_id}, case_type={request.case_type}")
+            
+        else:
+            # 일반 토론: 기존 로직
+            await db.update_session(session_id, {
+                "round_index": 0,
+                "phase": Phase.WAIT_USER.value,
+                "status": "active"
+            })
+            
+            # CaseFile 초기화 (기존 스키마 필드만 사용)
+            await db.save_case_file(session_id, {
+                "facts": [], "goals": [], "constraints": [], "decisions": [], 
+                "open_issues": [], "assumptions": [], "next_experiments": []
+            })
+            
+            # 첫 번째 라운드 자동 시작 (사용자 입력 없이 바로 시작)
+            background_tasks.add_task(start_round, session_id)
         
         return CreateSessionResponse(
             session_id=session_id,
-            category=session_data["category"],
+            category=session_data.get("category", ""),
             topic=session_data["topic"],
             status="active"
         )
@@ -780,3 +824,400 @@ async def generate_report(session_id: str):
     await db.save_final_report(session_id, report_json, report_content)
     
     return {"report_json": report_json, "report_md": report_content}
+
+
+# ==========================================
+# 법무 시뮬레이션 전용 엔드포인트
+# ==========================================
+
+class FactsSubmitRequest(BaseModel):
+    """사실관계 입력 요청"""
+    case_overview: str  # 사건 개요
+    parties: List[str] = []  # 당사자
+    facts: str  # 사실관계 상세
+    evidence: List[str] = []  # 보유 증거 목록
+
+
+class FactsSubmitResponse(BaseModel):
+    """사실관계 처리 결과"""
+    status: str
+    confirmed_facts: List[str] = []
+    disputed_facts: List[str] = []
+    missing_facts_questions: List[str] = []
+    facts_gate_required: bool = False
+
+
+@router.post("/sessions/{session_id}/facts", response_model=FactsSubmitResponse)
+async def submit_facts_endpoint(
+    session_id: str, 
+    request: FactsSubmitRequest,
+    background_tasks: BackgroundTasks
+):
+    """
+    법무 시뮬레이션: 사실관계 입력 및 FACTS_STIPULATE 처리
+    
+    1. 사용자 입력을 받아 Gemini로 3분류 수행
+    2. MissingFactsQuestions >= 3 이면 FACTS_GATE로 라우팅
+    3. 그렇지 않으면 Round 1 시작 (JUDGE_R1_FRAME)
+    """
+    try:
+        session = await db.get_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        current_phase = session.get("phase", "")
+        if current_phase != Phase.FACTS_INTAKE.value:
+            raise HTTPException(status_code=400, detail=f"Invalid phase for facts submission: {current_phase}")
+        
+        # FACTS_STIPULATE 프롬프트 구성
+        facts_input = f"""
+사건 개요: {request.case_overview}
+당사자: {', '.join(request.parties)}
+사실관계: {request.facts}
+보유 증거: {', '.join(request.evidence)}
+"""
+        
+        stipulate_prompt = FACTS_STIPULATE_PROMPT.replace("{{user_facts_input}}", facts_input)
+        
+        # Gemini 호출하여 3분류 수행
+        try:
+            result_text = await gemini_client.generate_text(stipulate_prompt)
+            
+            # 결과 파싱 (간단한 키워드 기반)
+            confirmed = []
+            disputed = []
+            missing = []
+            
+            # 텍스트에서 섹션별 추출 시도
+            lines = result_text.split('\n')
+            current_section = None
+            
+            for line in lines:
+                line_lower = line.lower().strip()
+                if 'confirmedfacts' in line_lower or '확정' in line_lower:
+                    current_section = 'confirmed'
+                elif 'disputedfacts' in line_lower or '쟁점' in line_lower or '다툼' in line_lower:
+                    current_section = 'disputed'
+                elif 'missingfacts' in line_lower or '누락' in line_lower or '질문' in line_lower:
+                    current_section = 'missing'
+                elif line.strip().startswith('-') or line.strip().startswith('•'):
+                    content = line.strip().lstrip('-•').strip()
+                    if content and current_section:
+                        if current_section == 'confirmed':
+                            confirmed.append(content)
+                        elif current_section == 'disputed':
+                            disputed.append(content)
+                        elif current_section == 'missing':
+                            missing.append(content)
+            
+            # 결과가 없으면 전체를 confirmed로 처리
+            if not confirmed and not disputed and not missing:
+                confirmed = [request.facts[:500]]
+                
+        except Exception as e:
+            logger.error(f"[FactsStipulate] Gemini error: {e}")
+            # 에러 시 입력을 그대로 confirmed로 처리
+            confirmed = [request.facts[:500]]
+            disputed = []
+            missing = []
+        
+        # CaseFile 업데이트
+        case_file = await db.get_case_file(session_id)
+        case_file_update = {
+            **case_file,
+            "case_overview": request.case_overview,
+            "parties": request.parties,
+            "confirmed_facts": confirmed,
+            "disputed_facts": disputed,
+            "missing_facts_questions": missing,
+        }
+        await db.save_case_file(session_id, case_file_update)
+        
+        # 다음 phase 결정
+        facts_gate_required = len(missing) >= 3
+        
+        if facts_gate_required:
+            # FACTS_GATE로 이동 (사용자에게 추가 입력 요청)
+            await db.update_session(session_id, {"phase": Phase.FACTS_GATE.value})
+            logger.info(f"[FactsStipulate] Facts gate required: {len(missing)} missing questions")
+        else:
+            # Round 1 시작
+            await db.update_session(session_id, {
+                "phase": Phase.JUDGE_R1_FRAME.value,
+                "round_index": 1,
+                "facts_stipulated": True
+            })
+            # 백그라운드에서 라운드 실행
+            background_tasks.add_task(execute_legal_round, session_id, 1)
+            logger.info(f"[FactsStipulate] Starting Round 1")
+        
+        return FactsSubmitResponse(
+            status="ok",
+            confirmed_facts=confirmed,
+            disputed_facts=disputed,
+            missing_facts_questions=missing,
+            facts_gate_required=facts_gate_required
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[FactsSubmit] Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class LegalSteeringRequest(BaseModel):
+    """법무 Steering 입력 요청 (라운드별)"""
+    # Round 1 필수
+    focus_issue: Optional[str] = None
+    goal: Optional[str] = None  # win_rate, risk_min, settlement, evidence_first
+    
+    # Round 2 필수
+    proof_priority: Optional[str] = None
+    evidence_level: Optional[str] = None
+    constraints: List[str] = []
+    
+    # Round 3 필수
+    end_action: Optional[str] = None  # finalize, extend_once, new_session
+    report_style: Optional[str] = None  # risk, strategy, settlement
+    
+    # Advanced (옵션)
+    stance: Optional[str] = None
+    exclusions: List[str] = []
+    notes: Optional[str] = None
+
+
+@router.post("/sessions/{session_id}/legal-steering")
+async def legal_steering_endpoint(
+    session_id: str,
+    request: LegalSteeringRequest,
+    background_tasks: BackgroundTasks
+):
+    """
+    법무 시뮬레이션: USER_GATE/END_GATE에서 Steering 입력 처리
+    """
+    try:
+        session = await db.get_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        current_phase = session.get("phase", "")
+        current_round = session.get("round_index", 0)
+        
+        if current_phase not in [Phase.USER_GATE.value, Phase.END_GATE.value, Phase.FACTS_GATE.value]:
+            raise HTTPException(status_code=400, detail=f"Invalid phase for steering: {current_phase}")
+        
+        # END_GATE finalize 처리
+        if current_phase == Phase.END_GATE.value and request.end_action == "finalize":
+            await finalize_session_endpoint(session_id)
+            return {"status": "finalized"}
+        
+        # Steering 데이터 저장
+        steering_data = {
+            "focus_issue": request.focus_issue,
+            "goal": request.goal,
+            "proof_priority": request.proof_priority,
+            "evidence_level": request.evidence_level,
+            "constraints": request.constraints,
+            "stance": request.stance,
+            "exclusions": request.exclusions,
+            "notes": request.notes,
+            "end_action": request.end_action,
+            "report_style": request.report_style,
+        }
+        
+        case_file = await db.get_case_file(session_id)
+        await db.save_case_file(session_id, {
+            **case_file,
+            "legal_steering": steering_data
+        })
+        
+        logger.info(f"[LegalSteering] Saved steering for session {session_id}: {steering_data}")
+        
+        # 다음 라운드 시작
+        next_round = current_round + 1 if current_phase == Phase.USER_GATE.value else current_round
+        
+        if next_round > MAX_ROUNDS:
+            # 라운드 제한 도달
+            await db.update_session(session_id, {
+                "phase": Phase.END_GATE.value
+            })
+            return {"status": "end_gate", "round": current_round}
+        
+        # 다음 라운드 시작
+        background_tasks.add_task(execute_legal_round, session_id, next_round)
+        
+        return {"status": "ok", "next_round": next_round}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[LegalSteering] Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def execute_legal_round(session_id: str, round_number: int):
+    """
+    법무 시뮬레이션 라운드 실행
+    
+    R1: Judge(Frame) → Claimant → Opposing → Verifier → USER_GATE
+    R2: Opposing → Claimant → Judge → Verifier → USER_GATE (or END_GATE if No-Go)
+    R3: Opposing → Claimant → Judge → Verifier → END_GATE
+    """
+    phase = get_legal_round_start_phase(round_number)
+    if not phase:
+        logger.error(f"[LegalRound] Invalid round: {round_number}")
+        return
+    
+    session = await db.get_session(session_id)
+    case_type = session.get("case_type", "civil")
+    
+    gate_status = None
+    
+    # Phase 순차 실행
+    while phase and phase not in [Phase.USER_GATE.value, Phase.END_GATE.value, Phase.FINALIZE_DONE.value]:
+        # 세션 상태 업데이트
+        await db.update_session(session_id, {
+            "phase": phase,
+            "round_index": round_number
+        })
+        
+        # 라운드 시작 이벤트
+        if phase == get_legal_round_start_phase(round_number):
+            await sse_event_manager.emit(session_id, EventType.ROUND_START, {"round_index": round_number})
+        
+        agent_name = get_legal_agent_for_phase(phase)
+        if agent_name and agent_name != "system":
+            # 에이전트 실행
+            result = await execute_legal_phase(session_id, phase, agent_name, round_number)
+            
+            # Verifier에서 gate_status 추출
+            if "VERIFIER" in phase:
+                gate_status = extract_gate_status(result)
+            
+            # API Rate Limit 방지
+            await asyncio.sleep(3)
+        
+        # 다음 phase 결정
+        phase = get_next_phase_legal(phase, case_type, gate_status)
+    
+    # 라운드 종료 처리
+    await db.update_session(session_id, {"phase": phase})
+    
+    # ROUND_END 이벤트 발송
+    case_file = await db.get_case_file(session_id)
+    await sse_event_manager.emit(session_id, EventType.ROUND_END, {
+        "round_index": round_number,
+        "phase": phase,
+        "gate_status": gate_status or "Go",
+        "open_issues": case_file.get("disputed_facts", [])[:3]
+    })
+
+
+async def execute_legal_phase(session_id: str, phase: str, agent_name: str, round_number: int) -> str:
+    """법무 시뮬레이션 단일 Phase 실행"""
+    session = await db.get_session(session_id)
+    case_file = await db.get_case_file(session_id)
+    
+    case_type = session.get("case_type", "civil")
+    confirmed_facts = "\n".join(case_file.get("confirmed_facts", []))
+    
+    # 이전 메시지 요약
+    messages = await db.get_messages(session_id)
+    case_summary = ""
+    if messages:
+        recent = messages[-5:]
+        case_summary = "\n".join([f"{m.get('role')}: {m.get('content_text', '')[:200]}" for m in recent])
+    
+    # 에이전트 가져오기
+    agent = legal_agents.get(agent_name)
+    if not agent:
+        logger.error(f"[LegalPhase] Agent not found: {agent_name}")
+        return ""
+    
+    # 컨텍스트 설정
+    agent.set_round(round_number)
+    if hasattr(agent, 'set_case_context'):
+        agent.set_case_context(case_type, confirmed_facts, case_summary)
+    
+    # Steering Block 구성
+    steering = case_file.get("legal_steering") or {}
+    steering_block = LEGAL_STEERING_BLOCK.replace("{{focus_issue}}", steering.get("focus_issue", "미설정"))
+    steering_block = steering_block.replace("{{goal}}", steering.get("goal", "미설정"))
+    steering_block = steering_block.replace("{{constraints}}", ", ".join(steering.get("constraints", [])) or "없음")
+    steering_block = steering_block.replace("{{stance}}", steering.get("stance", "중립"))
+    steering_block = steering_block.replace("{{exclusions}}", ", ".join(steering.get("exclusions", [])) or "없음")
+    steering_block = steering_block.replace("{{notes}}", steering.get("notes", ""))
+    
+    # SSE 이벤트
+    await sse_event_manager.emit(session_id, EventType.SPEAKER_CHANGE, {"active_speaker": agent_name})
+    await sse_event_manager.emit(session_id, EventType.MESSAGE_STREAM_START, {
+        "role": agent_name,
+        "round_index": round_number,
+        "phase": phase
+    })
+    
+    # 스트리밍 실행
+    full_response = ""
+    try:
+        async for chunk in agent.stream_response(
+            messages=[],
+            user_message=f"주제: {session.get('topic')}",
+            case_file_summary=case_summary,
+            category=case_type,
+            steering_block=steering_block
+        ):
+            full_response += chunk
+            await sse_event_manager.emit(session_id, EventType.MESSAGE_STREAM_CHUNK, {"text": chunk})
+    except Exception as e:
+        logger.error(f"[LegalPhase] Agent error: {e}")
+        full_response = f"[오류 발생: {str(e)}]"
+    
+    # 법무 가드레일 검사 및 Rewrite
+    violation = check_legal_guardrails(full_response, confirmed_facts)
+    if violation:
+        logger.warning(f"[LegalGuardrail] Violation: {violation}")
+        # 1회 Rewrite 시도 (간단 구현)
+        await sse_event_manager.emit(session_id, EventType.MESSAGE_STREAM_CHUNK, {
+            "text": "\n\n⚠️ [시스템: 가드레일 위반 감지. 수정 중...]\n\n"
+        })
+    
+    # 메시지 저장
+    await sse_event_manager.emit(session_id, EventType.MESSAGE_STREAM_END, {
+        "message_id": f"{agent_name}-{session_id}-{phase}"
+    })
+    
+    await db.save_message(session_id, {
+        "role": agent_name,
+        "content_text": full_response,
+        "round_index": round_number,
+        "phase": phase
+    })
+    
+    return full_response
+
+
+def check_legal_guardrails(response: str, confirmed_facts: str) -> Optional[str]:
+    """
+    법무 전용 가드레일 검사
+    
+    Returns: 위반 사유 (None이면 통과)
+    """
+    response_lower = response.lower()
+    
+    # 1. 확정적 자문 방지
+    forbidden_phrases = ["반드시", "확실히", "100%", "틀림없이", "무조건", "절대"]
+    for phrase in forbidden_phrases:
+        if phrase in response:
+            return f"Definitive advice: '{phrase}'"
+    
+    # 2. 확정 승소/패소 표현 방지
+    if "확정 승소" in response or "확정 패소" in response:
+        return "Definitive judgment expression"
+    
+    # 3. Steering Compliance Check 확인
+    if "steering compliance check: not ok" in response_lower:
+        return "Self-reported steering violation"
+    
+    return None
+

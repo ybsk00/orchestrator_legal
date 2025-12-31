@@ -3,7 +3,7 @@
 """
 from enum import Enum
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime
 import uuid
 
@@ -29,25 +29,36 @@ class SessionStatus(str, Enum):
 
 
 class Category(str, Enum):
-    """토론 카테고리 (4종)"""
+    """토론 카테고리 (4종) - 레거시, 일반 토론용"""
     NEWBIZ = "newbiz"       # 신규사업
     MARKETING = "marketing" # 마케팅
     DEV = "dev"             # 개발
     DOMAIN = "domain"       # 영역(운영/기타)
 
 
+class CaseType(str, Enum):
+    """법무 시뮬레이션 사건 유형"""
+    CRIMINAL = "criminal"  # 형사
+    CIVIL = "civil"        # 민사
+
+
 class Session(BaseModel):
     """토론 세션"""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     status: SessionStatus = SessionStatus.ACTIVE
-    category: Category
+    category: Optional[Category] = None  # 레거시, 일반 토론용
     topic: str
     round_index: int = 0  # 0에서 시작, 새 라운드 시작 시 증가
-    phase: Phase = Phase.IDLE
+    phase: str = "idle"  # Phase enum value as string
     max_rounds: int = 3
     ended_reason: Optional[str] = None  # "user_stop" | "reached_round_limit"
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # 법무 시뮬레이션 전용 필드
+    case_type: Optional[CaseType] = None  # 형사/민사 (None이면 일반 토론)
+    jurisdiction: str = "KR"  # 관할 (기본: 한국)
+    facts_stipulated: bool = False  # 사실관계 고정 완료 여부
     
     def can_start_new_round(self) -> bool:
         """새 라운드 시작 가능 여부"""

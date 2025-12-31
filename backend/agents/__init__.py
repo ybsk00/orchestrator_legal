@@ -5,3 +5,9 @@ from .agent2_critic import Agent2Critic
 from .agent3_synthesizer import Agent3Synthesizer
 from .verifier import VerifierAgent
 from .finalizer import Finalizer
+
+# 법무 시뮬레이션 에이전트
+from .legal_agent_judge import LegalAgentJudge
+from .legal_agent_claimant import LegalAgentClaimant
+from .legal_agent_opposing import LegalAgentOpposing
+from .legal_agent_verifier import LegalAgentVerifier

@@ -9,6 +9,8 @@ import TypingMessage from '@/components/TypingMessage'
 import GateSummaryCard from '@/components/gate/GateSummaryCard'
 import SteeringPanel from '@/components/gate/SteeringPanel'
 import EndGateCard from '@/components/gate/EndGateCard'
+// 법무 시뮬레이션 컴포넌트
+import { FactsIntakeForm, LegalGateForm, FactsSubmitResponse } from '@/components/legal'
 import styles from './page.module.css'
 
 // Avatar Panel은 클라이언트 사이드에서만 로드
@@ -24,7 +26,16 @@ interface SessionData {
     topic: string
     round_index: number
     phase: string
+    case_type?: string  // 법무 시뮬레이션: 'criminal' | 'civil'
 }
+
+// 법무 Phase 상수
+const LEGAL_PHASES = [
+    'FACTS_INTAKE', 'FACTS_STIPULATE', 'FACTS_GATE',
+    'JUDGE_R1_FRAME', 'CLAIMANT_R1', 'OPPOSING_R1', 'VERIFIER_R1',
+    'OPPOSING_R2', 'CLAIMANT_R2', 'JUDGE_R2', 'VERIFIER_R2',
+    'OPPOSING_R3', 'CLAIMANT_R3', 'JUDGE_R3', 'VERIFIER_R3',
+]
 
 export default function SessionPage() {
     const params = useParams()
@@ -187,14 +198,23 @@ export default function SessionPage() {
 
     const getAgentLabel = (role: string) => {
         switch (role) {
+            // 일반 토론 에이전트
             case 'agent1': return '🔵 Agent 1: 구현계획'
             case 'agent2': return '🟠 Agent 2: 리스크'
             case 'agent3': return '🟣 Agent 3: 합의안'
             case 'verifier': return '🔴 Verifier: 검증관'
+            // 법무 시뮬레이션 에이전트
+            case 'judge': return '⚖️ 재판장'
+            case 'claimant': return '🔵 원고측 (검사/원고대리)'
+            case 'opposing': return '🟠 피고측 (변호인/피고대리)'
             case 'user': return '👤 사용자'
             default: return role
         }
     }
+
+    // 법무 세션 여부 확인
+    const isLegalSession = session?.case_type ? true : false
+    const isLegalPhase = session?.phase ? LEGAL_PHASES.includes(session.phase) : false
 
     return (
         <main className={styles.container}>
@@ -246,7 +266,7 @@ export default function SessionPage() {
                                     {msg.isStreaming && <span className={styles.streamingDot}>●</span>}
                                 </div>
                                 <div className={styles.messageContent}>
-                                    {['agent1', 'agent2', 'agent3', 'verifier'].includes(msg.role) ? (
+                                    {['agent1', 'agent2', 'agent3', 'verifier', 'judge', 'claimant', 'opposing'].includes(msg.role) ? (
                                         <TypingMessage text={msg.content} speed={20} />
                                     ) : (
                                         msg.content
@@ -255,8 +275,55 @@ export default function SessionPage() {
                             </div>
                         ))}
 
-                        {/* USER_GATE / END_GATE UI 렌더링 - 마지막 메시지 스트리밍 완료 후 표시 */}
-                        {(session?.phase === 'USER_GATE' || session?.phase === 'END_GATE') &&
+                        {/* 법무 시뮬레이션: FACTS_INTAKE Phase - 사실관계 입력 폼 */}
+                        {isLegalSession && session?.phase === 'FACTS_INTAKE' && (
+                            <div className={styles.gateContainer}>
+                                <FactsIntakeForm
+                                    sessionId={sessionId}
+                                    onSubmit={(data: FactsSubmitResponse) => {
+                                        // Facts 제출 완료 후 세션 새로고침
+                                        console.log('Facts submitted:', data)
+                                        // 자동으로 다음 Phase로 전환
+                                    }}
+                                />
+                            </div>
+                        )}
+
+                        {/* 법무 시뮬레이션: FACTS_GATE Phase - 추가 사실관계 입력 */}
+                        {isLegalSession && session?.phase === 'FACTS_GATE' && (
+                            <div className={styles.gateContainer}>
+                                <div className={styles.factsGateWarning}>
+                                    <p>⚠️ 누락된 사실관계가 3개 이상입니다. 추가 정보를 입력해주세요.</p>
+                                </div>
+                                <FactsIntakeForm
+                                    sessionId={sessionId}
+                                    onSubmit={(data: FactsSubmitResponse) => {
+                                        console.log('Additional facts submitted:', data)
+                                    }}
+                                />
+                            </div>
+                        )}
+
+                        {/* 법무 시뮬레이션: USER_GATE / END_GATE - LegalGateForm */}
+                        {isLegalSession && (session?.phase === 'USER_GATE' || session?.phase === 'END_GATE') &&
+                            !messages.some(m => m.isStreaming) && (
+                                <div className={styles.gateContainer}>
+                                    <LegalGateForm
+                                        sessionId={sessionId}
+                                        roundIndex={session.round_index}
+                                        phase={session.phase}
+                                        caseType={session.case_type || 'civil'}
+                                        openIssues={gateData?.open_issues || []}
+                                        onSubmit={(result) => {
+                                            console.log('Legal steering submitted:', result)
+                                            // 다음 라운드 자동 시작
+                                        }}
+                                    />
+                                </div>
+                            )}
+
+                        {/* 일반 토론: USER_GATE / END_GATE UI 렌더링 */}
+                        {!isLegalSession && (session?.phase === 'USER_GATE' || session?.phase === 'END_GATE') &&
                             !messages.some(m => m.isStreaming) && (
                                 <div className={styles.gateContainer}>
                                     {/* GateSummaryCard는 gateData가 있을 때만 표시 */}

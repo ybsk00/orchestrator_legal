@@ -1,5 +1,5 @@
 """
-상태머신 - Phase 전이 테이블 (v2.2)
+상태머신 - Phase 전이 테이블 (v2.2 + Legal v1.1)
 
 책임:
 - PHASE_TRANSITIONS: 현재 phase → 다음 phase 매핑
@@ -10,6 +10,12 @@
 - Agent1은 Round 1에서만 호출 (Round 2/3 제거)
 - WAIT_USER에서 사용자 입력 시에만 round 증가
 - Unknown phase 시 FINALIZE_DONE 안전 복귀
+
+법무 시뮬레이션 (v1.1):
+- 4인 구성: Judge, Claimant, Opposing, Verifier
+- R1: JUDGE_R1_FRAME(프레임만) → Claimant → Opposing → Verifier
+- R2/R3: Opposing → Claimant → Judge → Verifier
+- 민사 No-Go 시 Round3 건너뛰고 END_GATE로 이동
 """
 import asyncio
 import logging
@@ -26,6 +32,7 @@ MAX_ROUNDS = 3
 
 class Phase(str, Enum):
     """모든 가능한 phase 상태"""
+    # === 일반 토론용 Phase (기존) ===
     # Round 1
     A1_R1_PLAN = "A1_R1_PLAN"
     A2_R1_CRIT = "A2_R1_CRIT"
@@ -42,14 +49,40 @@ class Phase(str, Enum):
     A3_R3_FINAL = "A3_R3_FINAL"
     V_R3_SIGNOFF = "V_R3_SIGNOFF"
     
-    # 상태
+    # === 법무 시뮬레이션 전용 Phase ===
+    # Facts 단계
+    FACTS_INTAKE = "FACTS_INTAKE"
+    FACTS_STIPULATE = "FACTS_STIPULATE"
+    FACTS_GATE = "FACTS_GATE"  # MissingFacts >= 3일 때
+    
+    # Round 1 (Judge 프레임 선행)
+    JUDGE_R1_FRAME = "JUDGE_R1_FRAME"
+    CLAIMANT_R1 = "CLAIMANT_R1"
+    OPPOSING_R1 = "OPPOSING_R1"
+    VERIFIER_R1 = "VERIFIER_R1"
+    
+    # Round 2 (Opposing 선행)
+    OPPOSING_R2 = "OPPOSING_R2"
+    CLAIMANT_R2 = "CLAIMANT_R2"
+    JUDGE_R2 = "JUDGE_R2"
+    VERIFIER_R2 = "VERIFIER_R2"
+    
+    # Round 3
+    OPPOSING_R3 = "OPPOSING_R3"
+    CLAIMANT_R3 = "CLAIMANT_R3"
+    JUDGE_R3 = "JUDGE_R3"
+    VERIFIER_R3 = "VERIFIER_R3"
+    
+    # === 공통 상태 ===
     WAIT_USER = "WAIT_USER"
     USER_GATE = "USER_GATE"  # 라운드 종료 후 사용자 개입 대기
     END_GATE = "END_GATE"    # 최종 종료 전 대기
     FINALIZE_DONE = "FINALIZE_DONE"
 
 
-# Phase 전이 테이블
+# ==========================================
+# 일반 토론용 전이 테이블 (기존)
+# ==========================================
 PHASE_TRANSITIONS = {
     # Round 1
     Phase.A1_R1_PLAN: Phase.A2_R1_CRIT,
@@ -107,6 +140,86 @@ PHASE_TO_ROUND = {
 }
 
 
+# ==========================================
+# 법무 시뮬레이션 전용 전이 테이블
+# ==========================================
+LEGAL_PHASE_TRANSITIONS = {
+    # Facts 단계
+    Phase.FACTS_INTAKE: Phase.FACTS_STIPULATE,
+    Phase.FACTS_STIPULATE: Phase.JUDGE_R1_FRAME,  # or FACTS_GATE if missing >= 3
+    Phase.FACTS_GATE: Phase.JUDGE_R1_FRAME,
+    
+    # Round 1 (Judge 프레임 선행)
+    Phase.JUDGE_R1_FRAME: Phase.CLAIMANT_R1,
+    Phase.CLAIMANT_R1: Phase.OPPOSING_R1,
+    Phase.OPPOSING_R1: Phase.VERIFIER_R1,
+    Phase.VERIFIER_R1: Phase.USER_GATE,
+    
+    # Round 2 (Opposing 선행)
+    Phase.OPPOSING_R2: Phase.CLAIMANT_R2,
+    Phase.CLAIMANT_R2: Phase.JUDGE_R2,
+    Phase.JUDGE_R2: Phase.VERIFIER_R2,
+    Phase.VERIFIER_R2: Phase.USER_GATE,  # 민사 No-Go시 END_GATE로 분기
+    
+    # Round 3
+    Phase.OPPOSING_R3: Phase.CLAIMANT_R3,
+    Phase.CLAIMANT_R3: Phase.JUDGE_R3,
+    Phase.JUDGE_R3: Phase.VERIFIER_R3,
+    Phase.VERIFIER_R3: Phase.END_GATE,
+}
+
+
+# 법무 라운드별 시작 phase
+LEGAL_ROUND_START_PHASE = {
+    1: Phase.JUDGE_R1_FRAME,
+    2: Phase.OPPOSING_R2,
+    3: Phase.OPPOSING_R3,
+}
+
+
+# 법무 Phase별 담당 에이전트
+LEGAL_PHASE_TO_AGENT = {
+    Phase.FACTS_INTAKE: "system",
+    Phase.FACTS_STIPULATE: "system",
+    Phase.FACTS_GATE: "system",
+    Phase.JUDGE_R1_FRAME: "judge",
+    Phase.CLAIMANT_R1: "claimant",
+    Phase.OPPOSING_R1: "opposing",
+    Phase.VERIFIER_R1: "verifier",
+    Phase.OPPOSING_R2: "opposing",
+    Phase.CLAIMANT_R2: "claimant",
+    Phase.JUDGE_R2: "judge",
+    Phase.VERIFIER_R2: "verifier",
+    Phase.OPPOSING_R3: "opposing",
+    Phase.CLAIMANT_R3: "claimant",
+    Phase.JUDGE_R3: "judge",
+    Phase.VERIFIER_R3: "verifier",
+}
+
+
+# 법무 Phase별 라운드 번호
+LEGAL_PHASE_TO_ROUND = {
+    Phase.FACTS_INTAKE: 0,
+    Phase.FACTS_STIPULATE: 0,
+    Phase.FACTS_GATE: 0,
+    Phase.JUDGE_R1_FRAME: 1,
+    Phase.CLAIMANT_R1: 1,
+    Phase.OPPOSING_R1: 1,
+    Phase.VERIFIER_R1: 1,
+    Phase.OPPOSING_R2: 2,
+    Phase.CLAIMANT_R2: 2,
+    Phase.JUDGE_R2: 2,
+    Phase.VERIFIER_R2: 2,
+    Phase.OPPOSING_R3: 3,
+    Phase.CLAIMANT_R3: 3,
+    Phase.JUDGE_R3: 3,
+    Phase.VERIFIER_R3: 3,
+}
+
+
+# ==========================================
+# 일반 토론용 함수
+# ==========================================
 def get_next_phase(current_phase: str, gate_status: Optional[str] = None) -> str:
     """
     현재 phase에서 다음 phase를 반환합니다.
@@ -180,6 +293,90 @@ def is_wait_user_phase(phase: str) -> bool:
 def is_final_phase(phase: str) -> bool:
     """FINALIZE_DONE phase인지 확인"""
     return phase == Phase.FINALIZE_DONE.value
+
+
+# ==========================================
+# 법무 시뮬레이션 전용 함수
+# ==========================================
+def get_next_phase_legal(
+    current_phase: str, 
+    case_type: Optional[str] = None,
+    gate_status: Optional[str] = None,
+    missing_facts_count: int = 0
+) -> str:
+    """
+    법무 시뮬레이션용 다음 phase 반환.
+    
+    Args:
+        current_phase: 현재 phase 문자열
+        case_type: 사건 유형 ("criminal" | "civil")
+        gate_status: Verifier gate 상태 ("Go", "Conditional", "No-Go")
+        missing_facts_count: MissingFactsQuestions 개수 (Facts 단계 분기용)
+    
+    Returns:
+        다음 phase 문자열
+    """
+    try:
+        phase_enum = Phase(current_phase)
+    except ValueError:
+        logger.error(f"Unknown legal phase: {current_phase}, forcing FINALIZE_DONE")
+        return Phase.FINALIZE_DONE.value
+    
+    # FACTS_STIPULATE에서 missing >= 3 이면 FACTS_GATE로
+    if phase_enum == Phase.FACTS_STIPULATE and missing_facts_count >= 3:
+        logger.info(f"Missing facts count ({missing_facts_count}) >= 3, routing to FACTS_GATE")
+        return Phase.FACTS_GATE.value
+    
+    # VERIFIER_R2에서 민사 + No-Go면 END_GATE로 (Round3 스킵)
+    if phase_enum == Phase.VERIFIER_R2:
+        if case_type == "civil" and gate_status == "No-Go":
+            logger.info("Civil case No-Go at R2, routing to END_GATE (skip R3)")
+            return Phase.END_GATE.value
+        return Phase.USER_GATE.value
+    
+    # 기본 전이 테이블 사용
+    next_phase = LEGAL_PHASE_TRANSITIONS.get(phase_enum)
+    
+    if next_phase is None:
+        logger.error(f"No legal transition for phase: {current_phase}, forcing END_GATE")
+        return Phase.END_GATE.value
+    
+    return next_phase.value
+
+
+def get_legal_round_start_phase(round_number: int) -> Optional[str]:
+    """법무 시뮬레이션용 라운드 시작 phase 반환."""
+    phase = LEGAL_ROUND_START_PHASE.get(round_number)
+    return phase.value if phase else None
+
+
+def get_legal_agent_for_phase(phase: str) -> Optional[str]:
+    """법무 phase를 담당하는 에이전트 반환."""
+    try:
+        phase_enum = Phase(phase)
+        return LEGAL_PHASE_TO_AGENT.get(phase_enum)
+    except ValueError:
+        return None
+
+
+def get_legal_round_for_phase(phase: str) -> Optional[int]:
+    """법무 phase가 속한 라운드 번호 반환."""
+    try:
+        phase_enum = Phase(phase)
+        return LEGAL_PHASE_TO_ROUND.get(phase_enum)
+    except ValueError:
+        return None
+
+
+def is_legal_phase(phase: str) -> bool:
+    """법무 시뮬레이션 phase인지 확인."""
+    legal_phases = [
+        Phase.FACTS_INTAKE.value, Phase.FACTS_STIPULATE.value, Phase.FACTS_GATE.value,
+        Phase.JUDGE_R1_FRAME.value, Phase.CLAIMANT_R1.value, Phase.OPPOSING_R1.value, Phase.VERIFIER_R1.value,
+        Phase.OPPOSING_R2.value, Phase.CLAIMANT_R2.value, Phase.JUDGE_R2.value, Phase.VERIFIER_R2.value,
+        Phase.OPPOSING_R3.value, Phase.CLAIMANT_R3.value, Phase.JUDGE_R3.value, Phase.VERIFIER_R3.value,
+    ]
+    return phase in legal_phases
 
 
 class StateMachine:
