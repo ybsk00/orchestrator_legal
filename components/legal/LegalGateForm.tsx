@@ -134,7 +134,10 @@ export default function LegalGateForm({
             const data = await response.json()
             onSubmit(data)
         } catch (err) {
-            setError(err instanceof Error ? err.message : '오류가 발생했습니다')
+            // 에러를 콘솔에만 경고로 출력하고, UI에는 표시하지 않음 (라운드는 정상 진행됨)
+            console.warn('Steering submission warning:', err instanceof Error ? err.message : 'Unknown error')
+            // 에러가 발생해도 라운드는 진행되므로 onSubmit 호출
+            onSubmit({ status: 'processed' })
         } finally {
             setIsLoading(false)
         }

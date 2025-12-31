@@ -54,7 +54,9 @@ export default function SteeringPanel({
         try {
             await onInput(steeringData)
         } catch (error) {
-            console.error('Failed to submit steering:', error)
+            // 에러를 콘솔에만 경고로 출력하고, 사용자에게는 표시하지 않음
+            console.warn('Steering submission warning:', error)
+        } finally {
             setIsSubmitting(false)
         }
     }

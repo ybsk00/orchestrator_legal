@@ -121,6 +121,7 @@ class SessionResponse(BaseModel):
     phase: str
     case_type: Optional[str] = None  # 법무 시뮬레이션: 'criminal' | 'civil'
     project_type: str = "general"
+    created_at: Optional[str] = None  # ISO format datetime string
 
 
 # Phase 실행 함수
@@ -776,7 +777,8 @@ async def list_sessions_endpoint(user_id: Optional[str] = Query(None)):
                 round_index=s.get("round_index", 0) or 0,
                 phase=s.get("phase", "idle") or "idle",
                 case_type=s.get("case_type"),
-                project_type=s.get("project_type", "general")
+                project_type=s.get("project_type", "general"),
+                created_at=s.get("created_at")
             ) for s in sessions
         ]
     except Exception as e:
@@ -810,11 +812,44 @@ async def finalize_session_endpoint(session_id: str):
         # 리포트 자동 생성 시도
         messages = await db.get_messages(session_id)
         if messages:
+            project_type = session.get("project_type", "general")
+            
             conversation_text = ""
             for msg in messages:
                 role = msg.get("role", "unknown")
                 content = msg.get("content_text", "")
                 conversation_text += f"{role}: {content}\n\n"
+            
+            # 프로젝트 타입별 분량 및 양식 설정
+            if project_type == "legal":
+                char_limit = "4000자"
+                format_guide = """[작성 양식 - 법률 분석 리포트]
+    1. **사안 요약**: 사건 개요 및 핵심 쟁점 정리
+    2. **법적 분석**: 관련 법령 및 판례 적용 분석
+    3. **원고측 주장 정리**: 원고측의 핵심 주장 및 근거
+    4. **피고측 주장 정리**: 피고측의 핵심 주장 및 근거
+    5. **승소 가능성 평가**: 각 쟁점별 승패 예측
+    6. **리스크 분석**: 잠재적 리스크 및 대응 전략
+    7. **권고안**: 실행 가능한 전략적 권고사항
+    8. **향후 절차**: 다음 진행 단계 및 일정"""
+            elif project_type == "dev_project":
+                char_limit = "4000자"
+                format_guide = """[작성 양식 - 개발 프로젝트 리포트]
+    1. **프로젝트 개요**: 목표 및 범위 요약
+    2. **핵심 결정사항**: 채택된 기술 스택, 아키텍처, 주요 결정
+    3. **범위 정의**: 포함 범위(In-Scope) 및 제외 범위(Out-Scope)
+    4. **기능 명세**: 주요 기능 및 사용자 스토리
+    5. **기술 구현 가이드**: 구체적인 기술 구현 방향
+    6. **UX/UI 가이드**: 디자인 방향 및 사용자 경험 고려사항
+    7. **일정 및 마일스톤**: 주차별 로드맵 (최소 4주)
+    8. **리스크 및 대응**: 예상 리스크 및 완화 전략
+    9. **성공 지표(KPI)**: 측정 가능한 성공 기준"""
+            else:
+                char_limit = "2000자"
+                format_guide = """[작성 양식]
+    1. **종합 결론**: 토론의 핵심 결과 요약
+    2. **실행 방안**: 구체적인 실행 단계 및 계획
+    3. **구현 방향**: 기술적/실무적 구현 가이드"""
             
             prompt = f"""
             다음은 AI 에이전트들이 나눈 토론 내용입니다.
@@ -823,12 +858,10 @@ async def finalize_session_endpoint(session_id: str):
             [토론 내용]
             {conversation_text}
             
-            [작성 양식]
-            1. **종합 결론**: 토론의 핵심 결과 요약
-            2. **실행 방안**: 구체적인 실행 단계 및 계획
-            3. **구현 방향**: 기술적/실무적 구현 가이드
+            {format_guide}
             
-            분량은 공백 포함 2000자 정도로 구체적이고 상세하게 서술해주세요.
+            분량은 공백 포함 {char_limit} 정도로 구체적이고 상세하게 서술해주세요.
+            각 섹션에 충분한 내용을 담아 실질적으로 활용 가능한 보고서를 작성해주세요.
             """
             
             try:
@@ -876,6 +909,8 @@ async def generate_report(session_id: str):
     if not messages:
         raise HTTPException(status_code=400, detail="No messages to summarize")
 
+    project_type = session.get("project_type", "general")
+    
     # 프롬프트 구성
     conversation_text = ""
     for msg in messages:
@@ -883,19 +918,50 @@ async def generate_report(session_id: str):
         content = msg.get("content_text", "")
         conversation_text += f"{role}: {content}\n\n"
 
+    # 프로젝트 타입별 분량 및 양식 설정
+    if project_type == "legal":
+        char_limit = "4000자"
+        format_guide = """
+    [작성 양식 - 법률 분석 리포트]
+    1. **사안 요약**: 사건 개요 및 핵심 쟁점 정리
+    2. **법적 분석**: 관련 법령 및 판례 적용 분석
+    3. **원고측 주장 정리**: 원고측의 핵심 주장 및 근거
+    4. **피고측 주장 정리**: 피고측의 핵심 주장 및 근거
+    5. **승소 가능성 평가**: 각 쟁점별 승패 예측
+    6. **리스크 분석**: 잠재적 리스크 및 대응 전략
+    7. **권고안**: 실행 가능한 전략적 권고사항
+    8. **향후 절차**: 다음 진행 단계 및 일정"""
+    elif project_type == "dev_project":
+        char_limit = "4000자"
+        format_guide = """
+    [작성 양식 - 개발 프로젝트 리포트]
+    1. **프로젝트 개요**: 목표 및 범위 요약
+    2. **핵심 결정사항**: 채택된 기술 스택, 아키텍처, 주요 결정
+    3. **범위 정의**: 포함 범위(In-Scope) 및 제외 범위(Out-Scope)
+    4. **기능 명세**: 주요 기능 및 사용자 스토리
+    5. **기술 구현 가이드**: 구체적인 기술 구현 방향
+    6. **UX/UI 가이드**: 디자인 방향 및 사용자 경험 고려사항
+    7. **일정 및 마일스톤**: 주차별 로드맵 (최소 4주)
+    8. **리스크 및 대응**: 예상 리스크 및 완화 전략
+    9. **성공 지표(KPI)**: 측정 가능한 성공 기준"""
+    else:
+        char_limit = "2000자"
+        format_guide = """
+    [작성 양식]
+    1. **종합 결론**: 토론의 핵심 결과 요약
+    2. **실행 방안**: 구체적인 실행 단계 및 계획
+    3. **구현 방향**: 기술적/실무적 구현 가이드"""
+
     prompt = f"""
     다음은 AI 에이전트들이 나눈 토론 내용입니다.
     이 내용을 바탕으로 최종 결론 보고서를 작성해주세요.
     
     [토론 내용]
     {conversation_text}
+    {format_guide}
     
-    [작성 양식]
-    1. **종합 결론**: 토론의 핵심 결과 요약
-    2. **실행 방안**: 구체적인 실행 단계 및 계획
-    3. **구현 방향**: 기술적/실무적 구현 가이드
-    
-    분량은 공백 포함 2000자 정도로 구체적이고 상세하게 서술해주세요.
+    분량은 공백 포함 {char_limit} 정도로 구체적이고 상세하게 서술해주세요.
+    각 섹션에 충분한 내용을 담아 실질적으로 활용 가능한 보고서를 작성해주세요.
     """
 
     # Gemini 호출

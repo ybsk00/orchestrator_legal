@@ -230,7 +230,15 @@ export default function DashboardPage() {
     }
 
     const formatDate = (dateStr: string) => {
+        if (!dateStr) return '날짜 없음'
+
         const date = new Date(dateStr)
+
+        // Invalid Date 체크
+        if (isNaN(date.getTime())) {
+            return '날짜 없음'
+        }
+
         return date.toLocaleDateString('ko-KR', {
             year: 'numeric',
             month: 'short',
@@ -290,6 +298,36 @@ export default function DashboardPage() {
                                 </span>
                             </button>
                         ))}
+                    </div>
+                </div>
+
+                {/* 개발 프로젝트 섹션 */}
+                <div className={styles.sidebarSection}>
+                    <h4 className={styles.sidebarLabel}>개발 프로젝트</h4>
+                    <div className={styles.filterList}>
+                        <button
+                            className={styles.filterItem}
+                            onClick={() => {
+                                setActiveTab('new')
+                                setMode('dev_project')
+                            }}
+                        >
+                            <span>🚀</span>
+                            <span>새 프로젝트 시작</span>
+                        </button>
+                        <button
+                            className={styles.filterItem}
+                            onClick={() => {
+                                setActiveTab('history')
+                                setFilterCategory('dev')
+                            }}
+                        >
+                            <span>💻</span>
+                            <span>프로젝트 목록</span>
+                            <span className={styles.filterCount}>
+                                {sessions.filter(s => s.category === 'dev').length}
+                            </span>
+                        </button>
                     </div>
                 </div>
 

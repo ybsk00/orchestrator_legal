@@ -227,6 +227,14 @@ export default function SessionPage() {
         { id: 'dm', name: 'Delivery Manager', role: 'Agile Coach', colorTheme: 'red' as const },
     ]
 
+    // 법무 시뮬레이션 에이전트 설정
+    const LEGAL_AGENTS = [
+        { id: 'judge', name: '재판장', role: 'Judge', colorTheme: 'blue' as const },
+        { id: 'claimant', name: '원고측', role: session?.case_type === 'criminal' ? '검사' : '원고대리', colorTheme: 'orange' as const },
+        { id: 'opposing', name: '피고측', role: session?.case_type === 'criminal' ? '변호인' : '피고대리', colorTheme: 'purple' as const },
+        { id: 'verifier', name: '검증관', role: 'Verifier', colorTheme: 'red' as const },
+    ]
+
     // 법무 세션 여부 확인
     const isLegalSession = session?.project_type === 'legal' || session?.case_type
     const isDevProject = session?.project_type === 'dev_project'
@@ -240,7 +248,7 @@ export default function SessionPage() {
                     <Suspense fallback={<div className={styles.avatarPlaceholder}>로딩 중...</div>}>
                         <AvatarPanel
                             activeSpeaker={activeSpeaker}
-                            agents={isDevProject ? DEV_PROJECT_AGENTS : undefined}
+                            agents={isLegalSession ? LEGAL_AGENTS : isDevProject ? DEV_PROJECT_AGENTS : undefined}
                         />
                     </Suspense>
                 </div>
