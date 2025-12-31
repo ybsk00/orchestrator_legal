@@ -102,6 +102,7 @@ class SessionResponse(BaseModel):
     topic: str
     round_index: int
     phase: str
+    case_type: Optional[str] = None  # 법무 시뮬레이션: 'criminal' | 'civil'
 
 
 # Phase 실행 함수
@@ -664,7 +665,8 @@ async def get_session_endpoint(session_id: str):
             category=session.get("category", ""),
             topic=session.get("topic", ""),
             round_index=session.get("round_index", 0),
-            phase=session.get("phase", "")
+            phase=session.get("phase", ""),
+            case_type=session.get("case_type")
         )
     except HTTPException:
         raise
@@ -690,7 +692,8 @@ async def list_sessions_endpoint(user_id: Optional[str] = Query(None)):
                 category=s.get("category", ""),
                 topic=s.get("topic", ""),
                 round_index=s.get("round_index", 0) or 0,
-                phase=s.get("phase", "idle") or "idle"
+                phase=s.get("phase", "idle") or "idle",
+                case_type=s.get("case_type")
             ) for s in sessions
         ]
     except Exception as e:
