@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { supabase } from './supabase'
+import { useEffect, useState, useMemo } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 export interface Message {
     id: string
@@ -17,6 +17,9 @@ export function useRealtimeMessages(sessionId: string | null) {
     const [isLoading, setIsLoading] = useState(true)
 
     const [isConnected, setIsConnected] = useState(false)
+
+    // 인증된 Supabase 클라이언트 (useMemo로 안정적 인스턴스)
+    const supabase = useMemo(() => createClient(), [])
 
     useEffect(() => {
         if (!sessionId) return
@@ -91,7 +94,7 @@ export function useRealtimeMessages(sessionId: string | null) {
             supabase.removeChannel(channel)
             setIsConnected(false)
         }
-    }, [sessionId])
+    }, [sessionId, supabase])
 
     return { messages, isLoading, isConnected }
 }
