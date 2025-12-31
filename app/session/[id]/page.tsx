@@ -113,7 +113,7 @@ export default function SessionPage() {
             })
             if (res.ok) {
                 // 대시보드로 이동
-                router.push('/')
+                router.push('/dashboard')
             }
         } catch (error) {
             console.error('Failed to finalize:', error)
@@ -177,7 +177,7 @@ export default function SessionPage() {
 
             // finalize 또는 new_session 액션일 경우 대시보드로 이동
             if (res.ok && (action === 'finalize' || action === 'new_session')) {
-                router.push('/')
+                router.push('/dashboard')
             }
         } catch (error) {
             console.error('Steering action failed:', error)
