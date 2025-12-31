@@ -326,10 +326,19 @@ async def execute_round(session_id: str, current_round: int):
     """
     라운드 내 모든 phase를 순차 실행합니다.
     """
+    # 세션 정보 조회 (project_type 확인용)
+    session_data = await db.get_session(session_id)
+    if not session_data:
+        logger.error(f"Session not found: {session_id}")
+        return
+
+    project_type = session_data.get("project_type", "general")
+    case_type = session_data.get("case_type")
+
     # 라운드 시작 phase
-    phase = get_round_start_phase(current_round)
+    phase = get_round_start_phase(current_round, project_type)
     if not phase:
-        logger.error(f"Invalid round: {current_round}")
+        logger.error(f"Invalid round: {current_round} for project_type: {project_type}")
         await db.update_session(session_id, {"phase": Phase.FINALIZE_DONE.value, "status": "finalized"})
         await sse_event_manager.emit(session_id, EventType.SESSION_END, {})
         return
@@ -345,13 +354,13 @@ async def execute_round(session_id: str, current_round: int):
         })
         
         # 라운드 시작 이벤트 (첫 phase에서만)
-        if phase == get_round_start_phase(current_round):
+        if phase == get_round_start_phase(current_round, project_type):
             await sse_event_manager.emit(session_id, EventType.ROUND_START, {"round_index": current_round})
         
         # Phase 설정 가져오기
         config = get_phase_config(phase)
         
-        logger.info(f"[ExecuteRound] Executing phase={phase}, round={current_round}")
+        logger.info(f"[ExecuteRound] Executing phase={phase}, round={current_round}, project_type={project_type}")
         
         # Phase 실행
         result = await execute_phase(session_id, phase, config)
@@ -360,11 +369,11 @@ async def execute_round(session_id: str, current_round: int):
         await asyncio.sleep(3)
         
         # Verifier gate 결과 추출
-        if "V_R2_GATE" in phase or "V_R3_SIGNOFF" in phase or "V_R1_AUDIT" in phase:
+        if "V_R2_GATE" in phase or "V_R3_SIGNOFF" in phase or "V_R1_AUDIT" in phase or "VERIFIER" in phase:
             gate_status = extract_gate_status(result)
         
         # 다음 phase로 전이
-        phase = get_next_phase(phase, gate_status)
+        phase = get_next_phase(phase, project_type, gate_status, case_type)
     
     # 라운드 종료 (USER_GATE, END_GATE, WAIT_USER, FINALIZE_DONE)
     await db.update_session(session_id, {"phase": phase})
