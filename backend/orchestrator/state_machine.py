@@ -96,7 +96,6 @@ class Phase(str, Enum):
     DM_R3 = "DM_R3"
     TECH_R3 = "TECH_R3"
     UX_R3 = "UX_R3"
-    VERIFIER_R3 = "VERIFIER_R3"
 
 
 # ==========================================
