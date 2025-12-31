@@ -276,12 +276,7 @@ export default function SessionPage() {
                                     )}
 
                                     {session.phase === 'END_GATE' && (
-                                        <EndGateCard
-                                            sessionId={sessionId}
-                                            onFinalize={() => handleSteeringAction('finalize')}
-                                            onExtend={() => handleSteeringAction('extend')}
-                                            onNewSession={() => handleSteeringAction('new_session')}
-                                        />
+                                        <EndGateCard sessionId={sessionId} />
                                     )}
                                 </div>
                             )}

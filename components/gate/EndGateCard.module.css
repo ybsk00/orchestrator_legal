@@ -20,80 +20,21 @@
     margin-bottom: 2rem;
 }
 
-.actions {
-    display: flex;
-    justify-content: space-around;
-    align-items: stretch;
-    gap: 1rem;
-}
-
-.actionGroup {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 1rem;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
-}
-
-.actionGroup h4 {
-    margin: 0 0 0.5rem 0;
-    color: #fff;
-}
-
-.actionGroup p {
-    font-size: 0.9rem;
-    color: #aaa;
-    margin-bottom: 1rem;
-    flex: 1;
-}
-
-.divider {
-    width: 1px;
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.finalizeBtn,
-.extendBtn,
-.newSessionBtn {
-    width: 100%;
-    padding: 0.8rem;
+.dashboardBtn {
+    padding: 1rem 2rem;
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
+    font-size: 1.1rem;
     font-weight: bold;
     cursor: pointer;
     transition: all 0.2s;
-}
-
-.finalizeBtn {
-    background: #ff4444;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
     color: #fff;
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
 }
 
-.finalizeBtn:hover {
-    background: #CC0000;
-}
-
-.extendBtn {
-    background: #ffbb33;
-    color: #000;
-}
-
-.extendBtn:hover {
-    background: #FF8800;
-}
-
-.newSessionBtn {
-    background: #00C851;
-    color: #fff;
-}
-
-.newSessionBtn:hover {
-    background: #007E33;
-}
-
-.card button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.dashboardBtn:hover {
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
 }
