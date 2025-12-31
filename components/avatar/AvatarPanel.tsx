@@ -13,6 +13,60 @@ interface AgentConfig {
     colorTheme: 'blue' | 'orange' | 'purple' | 'red'
 }
 
+interface AgentCardProps {
+    agentId: string
+    name: string
+    role: string
+    isSpeaking: boolean
+    colorTheme: 'blue' | 'orange' | 'purple' | 'red'
+}
+
+function AgentCard({ agentId, name, role, isSpeaking, colorTheme }: AgentCardProps) {
+    const videoRef = useRef<HTMLVideoElement>(null)
+
+    useEffect(() => {
+        if (videoRef.current) {
+            const newSrc = isSpeaking ? '/Talk.mp4' : '/Idle.mp4'
+            // Only update if src changed to avoid flickering
+            if (!videoRef.current.src.endsWith(newSrc)) {
+                videoRef.current.src = newSrc
+                videoRef.current.play().catch(() => { })
+            }
+        }
+    }, [isSpeaking])
+
+    return (
+        <div className={`${styles.agentCard} ${styles[colorTheme]} ${isSpeaking ? styles.speaking : ''}`}>
+            <div className={styles.cardHeader}>
+                <span className={styles.agentName}>{name}</span>
+                <span className={styles.agentRole}>{role}</span>
+            </div>
+            <div className={styles.videoContainer}>
+                <video
+                    ref={videoRef}
+                    className={styles.video}
+                    loop
+                    muted
+                    playsInline
+                    autoPlay
+                    src="/Idle.mp4"
+                />
+                <div className={styles.statusLabel}>
+                    {isSpeaking ? (
+                        <div className={styles.speakingStatus}>
+                            <span>●</span> Speaking
+                        </div>
+                    ) : (
+                        <div className={styles.idleStatus}>
+                            <span>○</span> Idle
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
+
 interface AvatarPanelProps {
     activeSpeaker: string | null
     agents?: AgentConfig[]
