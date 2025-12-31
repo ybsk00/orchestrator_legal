@@ -210,6 +210,9 @@ export default function SessionPage() {
                 <div className={styles.chatSection}>
                     {/* 헤더 */}
                     <div className={styles.chatHeader}>
+                        <button className={styles.backBtn} onClick={() => router.push('/dashboard')}>
+                            ← 대시보드
+                        </button>
                         <div className={styles.headerInfo}>
                             <span className={styles.categoryBadge}>{session?.category}</span>
                             <h2>{session?.topic}</h2>
