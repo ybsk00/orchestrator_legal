@@ -74,9 +74,10 @@ class CreateSessionRequest(BaseModel):
 
 class CreateSessionResponse(BaseModel):
     session_id: str
-    category: str
+    category: Optional[str] = None  # 일반 토론용 (법무 세션은 None)
     topic: str
     status: str
+    case_type: Optional[str] = None  # 법무 시뮬레이션: 'criminal' | 'civil'
 
 
 class UserMessageRequest(BaseModel):
@@ -499,9 +500,10 @@ async def create_session_endpoint(request: CreateSessionRequest, background_task
         
         return CreateSessionResponse(
             session_id=session_id,
-            category=session_data.get("category", ""),
+            category=session_data.get("category"),
             topic=session_data["topic"],
-            status="active"
+            status="active",
+            case_type=request.case_type
         )
         
     except Exception as e:
