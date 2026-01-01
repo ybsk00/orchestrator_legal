@@ -383,6 +383,7 @@ async def execute_round(session_id: str, current_round: int):
         phase = get_next_phase(phase, project_type, gate_status, case_type)
     
     # 라운드 종료 (USER_GATE, END_GATE, WAIT_USER, FINALIZE_DONE)
+    logger.info(f"[ExecuteRound] Round {current_round} completed. Final phase: {phase}. Updating session.")
     await db.update_session(session_id, {"phase": phase})
     
     if is_final_phase(phase):
@@ -523,7 +524,8 @@ async def create_session_endpoint(request: CreateSessionRequest, background_task
                 "phase": Phase.FACTS_INTAKE.value,
                 "status": "active",
                 "case_type": request.case_type or "civil",
-                "project_type": "legal"
+                "project_type": "legal",
+                "category": "legal"  # 법무 세션 카테고리 설정
             })
             
             # CaseFile 초기화 (법무 필드 포함)
@@ -543,7 +545,8 @@ async def create_session_endpoint(request: CreateSessionRequest, background_task
                 "round_index": 1, # R1부터 시작
                 "phase": Phase.PRD_R1.value,
                 "status": "active",
-                "project_type": "dev_project"
+                "project_type": "dev_project",
+                "category": "dev_project"  # 개발 프로젝트 카테고리 설정
             })
             
             # CaseFile 초기화 (Dev Project 필드 포함)
@@ -681,8 +684,16 @@ async def steering_endpoint(session_id: str, request: SteeringRequest, backgroun
         session = await db.get_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
-            
+        
+        current_phase = session.get("phase", "")
         current_round = session.get("round_index", 0)
+        
+        # Phase 체크: USER_GATE 또는 END_GATE 상태에서만 처리 가능
+        if current_phase not in [Phase.USER_GATE.value, Phase.END_GATE.value]:
+            logger.warning(f"[Steering] Cannot process steering action. Current phase is {current_phase}, expected USER_GATE or END_GATE")
+            return {"status": "error", "message": f"현재 상태({current_phase})에서는 사용자 개입을 처리할 수 없습니다."}
+        
+        logger.info(f"[Steering] Processing action={request.action}, session={session_id}, phase={current_phase}, round={current_round}")
         
         # Idempotency Check (TODO: 실제 구현 필요, 여기선 로그만)
         if request.request_id:
@@ -721,6 +732,7 @@ async def steering_endpoint(session_id: str, request: SteeringRequest, backgroun
         # Race Condition 방지를 위해 상태만 변경하고 백그라운드에서 실행
         
         # 다음 라운드 시작 이벤트 발행 (UI 반응용)
+        logger.info(f"[Steering] Starting next round. Current round: {current_round} -> {current_round + 1}")
         await sse_event_manager.emit(session_id, EventType.ROUND_START, {"round_index": current_round + 1})
         
         # 실제 실행은 백그라운드에서
