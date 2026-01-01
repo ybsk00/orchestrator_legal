@@ -87,9 +87,15 @@ export default function DashboardPage() {
     const filteredSessions = useMemo(() => {
         let result = [...sessions]
 
-        // Category filter
+        // Category filter (일반 프로젝트 전체 목록일 때 법무/개발 프로젝트 제외)
         if (filterCategory) {
             result = result.filter(s => s.category === filterCategory)
+        } else if (!filterCaseType) {
+            // filterCategory가 없고 filterCaseType도 없으면 일반 프로젝트만 표시
+            result = result.filter(s =>
+                ['newbiz', 'marketing', 'dev', 'domain'].includes(s.category) ||
+                (!s.category && !s.case_type && (s as any).project_type !== 'dev_project' && (s as any).project_type !== 'legal')
+            )
         }
 
         // Date filter
@@ -294,7 +300,9 @@ export default function DashboardPage() {
                                 <span>{cat.icon}</span>
                                 <span>{cat.label}</span>
                                 <span className={styles.filterCount}>
-                                    {cat.value === '' ? sessions.length : sessions.filter(s => s.category === cat.value).length}
+                                    {cat.value === ''
+                                        ? sessions.filter(s => ['newbiz', 'marketing', 'dev', 'domain'].includes(s.category) || (!s.category && !s.case_type && (s as any).project_type !== 'dev_project' && (s as any).project_type !== 'legal')).length
+                                        : sessions.filter(s => s.category === cat.value).length}
                                 </span>
                             </button>
                         ))}
