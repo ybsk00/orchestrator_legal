@@ -16,8 +16,6 @@ const CATEGORIES: { value: Category; label: string; icon: string }[] = [
     { value: 'marketing', label: '마케팅', icon: '📈' },
     { value: 'dev', label: '개발', icon: '💻' },
     { value: 'domain', label: '운영', icon: '🏢' },
-    { value: 'legal', label: '법무', icon: '⚖️' },
-    { value: 'dev_project', label: '개발 프로젝트', icon: '🚀' },
 ]
 
 const CASE_TYPES: { value: CaseType; label: string; icon: string; desc: string }[] = [
