@@ -412,7 +412,7 @@ async def execute_round(session_id: str, current_round: int):
         # ROUND_END 이벤트 발송 (게이트 데이터 포함 - 표준화된 페이로드 v2.1)
         payload = {
             "session_id": session_id,
-            "project_type": session.get("project_type", "general"),
+            "project_type": session_data.get("project_type", "general"),
             "current_round": current_round,
             "phase_completed": phase,
             "round_index": current_round, # 호환성 유지
