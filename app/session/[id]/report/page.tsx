@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import styles from './page.module.css'
 
 export default function ReportPage() {
     const params = useParams()
+    const router = useRouter()
     const sessionId = params.id as string
     const [report, setReport] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
@@ -78,7 +79,7 @@ export default function ReportPage() {
                 <h1>📑 최종 합의 리포트</h1>
                 <div className={styles.actions}>
                     <button onClick={() => window.print()}>인쇄 / PDF 저장</button>
-                    <button onClick={() => window.close()}>닫기</button>
+                    <button onClick={() => router.back()}>닫기</button>
                 </div>
             </header>
             <main className={styles.reportContent}>
