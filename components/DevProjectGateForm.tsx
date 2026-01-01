@@ -43,10 +43,10 @@ export default function DevProjectGateForm({
         try {
             const steeringData = { focus, goal, constraints, free_text: freeText }
             await onSubmit('input', steeringData)
+            // 성공 시 isSubmitting 유지 - 다음 라운드 시작되면 컴포넌트 리마운트됨
         } catch (error) {
             console.warn('Steering submission warning:', error)
-        } finally {
-            setIsSubmitting(false)
+            setIsSubmitting(false) // 에러 시에만 다시 활성화
         }
     }
 
@@ -54,10 +54,10 @@ export default function DevProjectGateForm({
         setIsSubmitting(true)
         try {
             await onSubmit('skip')
+            // 성공 시 isSubmitting 유지 - 다음 라운드 시작되면 컴포넌트 리마운트됨
         } catch (error) {
             console.warn('Skip warning:', error)
-        } finally {
-            setIsSubmitting(false)
+            setIsSubmitting(false) // 에러 시에만 다시 활성화
         }
     }
 
