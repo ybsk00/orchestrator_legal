@@ -1254,6 +1254,13 @@ async def execute_legal_round(session_id: str, round_number: int):
         if agent_name and agent_name != "system":
             # 에이전트 실행
             result = await execute_legal_phase(session_id, phase, agent_name, round_number)
+        
+        # 다음 phase로 전이 (무한 루프 방지)
+        phase = get_next_phase_legal(phase, case_type, gate_status)
+    
+    # 최종 상태(USER_GATE/END_GATE) 업데이트
+    if phase:
+        await db.update_session(session_id, {"phase": phase})
     
     # ROUND_END 이벤트 발송
     case_file = await db.get_case_file(session_id)
