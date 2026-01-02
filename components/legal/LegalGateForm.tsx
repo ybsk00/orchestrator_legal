@@ -86,6 +86,7 @@ export default function LegalGateForm({
 
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [isSubmitted, setIsSubmitted] = useState(false)  // 제출 완료 상태 추적
 
     // 필수 필드 검증
     const isValid = () => {
@@ -132,12 +133,13 @@ export default function LegalGateForm({
             }
 
             const data = await response.json()
+            setIsSubmitted(true)  // 성공 시 제출 완료 상태로 변경
             onSubmit(data)
         } catch (err) {
-            // 에러를 콘솔에만 경고로 출력하고, UI에는 표시하지 않음 (라운드는 정상 진행됨)
-            console.warn('Steering submission warning:', err instanceof Error ? err.message : 'Unknown error')
-            // 에러가 발생해도 라운드는 진행되므로 onSubmit 호출
-            onSubmit({ status: 'processed' })
+            // 에러 발생 시 사용자에게 알리고 재시도 가능하게 함
+            const errorMessage = err instanceof Error ? err.message : '요청 처리 중 오류가 발생했습니다.'
+            console.warn('Steering submission error:', errorMessage)
+            setError('잠시 후 다시 시도해주세요. (서버가 아직 준비 중일 수 있습니다)')
         } finally {
             setIsLoading(false)
         }
@@ -379,9 +381,9 @@ export default function LegalGateForm({
                 <button
                     type="submit"
                     className={styles.submitBtn}
-                    disabled={!isValid() || isLoading}
+                    disabled={!isValid() || isLoading || isSubmitted}
                 >
-                    {isLoading ? '처리 중...' : phase === 'END_GATE' ? '완료' : '다음 라운드 시작 →'}
+                    {isLoading ? '처리 중...' : isSubmitted ? '✓ 제출됨' : phase === 'END_GATE' ? '완료' : '다음 라운드 시작 →'}
                 </button>
             </form>
         </div>
