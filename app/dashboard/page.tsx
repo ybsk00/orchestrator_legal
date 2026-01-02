@@ -316,16 +316,6 @@ export default function DashboardPage() {
                         <button
                             className={styles.filterItem}
                             onClick={() => {
-                                setActiveTab('new')
-                                setMode('dev_project')
-                            }}
-                        >
-                            <span>🚀</span>
-                            <span>새 프로젝트 시작</span>
-                        </button>
-                        <button
-                            className={styles.filterItem}
-                            onClick={() => {
                                 setActiveTab('history')
                                 setFilterCategory('dev_project')
                             }}
@@ -335,6 +325,16 @@ export default function DashboardPage() {
                             <span className={styles.filterCount}>
                                 {sessions.filter(s => s.category === 'dev_project').length}
                             </span>
+                        </button>
+                        <button
+                            className={styles.filterItem}
+                            onClick={() => {
+                                setActiveTab('new')
+                                setMode('dev_project')
+                            }}
+                        >
+                            <span>🚀</span>
+                            <span>새 프로젝트 시작</span>
                         </button>
                     </div>
                 </div>
